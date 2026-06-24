@@ -192,7 +192,7 @@ class TavilyFetcher:
             a for a in articles
             if not _is_social_media_url(a["url"])
             and not _is_index_page(a["url"])
-            and len(a.get("content", "")) >= 50
+            and len(a.get("content", "")) >= 150
         ]
         return self._dedupe_by_url(articles)
 

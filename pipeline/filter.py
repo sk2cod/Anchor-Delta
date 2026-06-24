@@ -8,6 +8,13 @@ from zoneinfo import ZoneInfo
 
 from db.noise_log import log_noise
 from db.processed_articles import is_url_seen, mark_article_processed
+from pipeline.simhash import (
+    SIMHASH_THRESHOLD,
+    TFIDF_THRESHOLD,
+    compute_title_simhash,
+    compute_tfidf_similarity,
+    is_simhash_duplicate,
+)
 
 SYDNEY_TZ = ZoneInfo("Australia/Sydney")
 
@@ -69,38 +76,78 @@ def _gate_1_url_uniqueness(article, seen_urls):
     return True
 
 
-def _gate_2_headline_dedup(article, seen_headlines, survivors):
-    headline_hash = _headline_hash(article.get("title", ""))
-    article["_headline_hash"] = headline_hash
+def _find_simhash_match_index(new_hash, seen_simhashes, threshold=SIMHASH_THRESHOLD):
+    new_val = int(new_hash)
+    for idx, existing in enumerate(seen_simhashes):
+        if bin(new_val ^ int(existing)).count("1") <= threshold:
+            return idx
+    return None
 
-    existing_entry = seen_headlines.get(headline_hash)
 
-    # Duplicate headlines are compared against the best candidate seen so far
-    # in this run, not a stored content length (processed_articles only keeps
-    # hashes), so the longer-content survivor can only be decided in-memory.
-    if existing_entry is not None:
-        existing_article = existing_entry["article"]
-        if len(article.get("content", "")) > len(existing_article.get("content", "")):
-            if existing_entry["in_survivors"]:
+def _find_tfidf_match_index(new_text, seen_texts, threshold=TFIDF_THRESHOLD):
+    best_index = None
+    best_score = 0.0
+    for idx, existing_text in enumerate(seen_texts):
+        score = compute_tfidf_similarity(new_text, [existing_text])
+        if score >= threshold and score > best_score:
+            best_score = score
+            best_index = idx
+    return best_index
+
+
+def _gate_2_dedup(article, seen_simhashes, seen_texts, seen_lengths, seen_articles, survivors):
+    article["_headline_hash"] = _headline_hash(article.get("title", ""))
+
+    title = article.get("title", "")
+    content = article.get("content", "") or ""
+    text = title + " " + content[:300]
+    content_length = len(content)
+
+    new_simhash = compute_title_simhash(title)
+
+    # Stage A: SimHash on the title catches near-identical headlines cheaply.
+    match_index = None
+    if is_simhash_duplicate(new_simhash, seen_simhashes):
+        match_index = _find_simhash_match_index(new_simhash, seen_simhashes)
+
+    # Stage B: TF-IDF on title + content excerpt catches reworded headlines
+    # that SimHash misses, since it only ever runs if Stage A found nothing.
+    if match_index is None and seen_texts:
+        match_index = _find_tfidf_match_index(text, seen_texts)
+
+    # seen_simhashes/seen_texts/seen_lengths/seen_articles are kept in lockstep
+    # so a matched index can recover the original article for logging/removal.
+    if match_index is not None:
+        existing_length = seen_lengths[match_index]
+        existing_article = seen_articles[match_index]
+
+        if content_length > existing_length:
+            if existing_article in survivors:
                 survivors.remove(existing_article)
             log_noise(
                 headline=existing_article.get("title", ""),
                 source_url=existing_article["url"],
                 gate_failed="gate_2",
-                reason="duplicate headline, shorter content",
+                reason="near-duplicate headline, shorter content discarded",
             )
-            seen_headlines[headline_hash] = {"article": article, "in_survivors": False}
+            seen_simhashes[match_index] = new_simhash
+            seen_texts[match_index] = text
+            seen_lengths[match_index] = content_length
+            seen_articles[match_index] = article
             return True
-        else:
-            log_noise(
-                headline=article.get("title", ""),
-                source_url=article["url"],
-                gate_failed="gate_2",
-                reason="duplicate headline, shorter content",
-            )
-            return False
 
-    seen_headlines[headline_hash] = {"article": article, "in_survivors": False}
+        log_noise(
+            headline=article.get("title", ""),
+            source_url=article["url"],
+            gate_failed="gate_2",
+            reason="near-duplicate headline, shorter content discarded",
+        )
+        return False
+
+    seen_simhashes.append(new_simhash)
+    seen_texts.append(text)
+    seen_lengths.append(content_length)
+    seen_articles.append(article)
     return True
 
 
@@ -152,14 +199,17 @@ def _gate_4_freshness_check(article):
 
 def run_filter_pipeline(articles):
     survivors = []
-    seen_headlines = {}
+    seen_simhashes = []
+    seen_texts = []
+    seen_lengths = []
+    seen_articles = []
     seen_urls = set()
 
     for article in articles:
         if not _gate_1_url_uniqueness(article, seen_urls):
             continue
 
-        if not _gate_2_headline_dedup(article, seen_headlines, survivors):
+        if not _gate_2_dedup(article, seen_simhashes, seen_texts, seen_lengths, seen_articles, survivors):
             continue
 
         if not _gate_3_keyword_filter(article):
@@ -170,7 +220,6 @@ def run_filter_pipeline(articles):
             continue
 
         survivors.append(article)
-        seen_headlines[article["_headline_hash"]]["in_survivors"] = True
 
     for article in survivors:
         mark_article_processed(article["_url_hash"], article["_headline_hash"], article["url"])

@@ -1,13 +1,15 @@
 from db.cards import get_active_cards
+from db.noise_log import log_noise
 from pipeline.engine import get_run_stats, reset_run_stats
 from pipeline.fetcher import TavilyFetcher
 from pipeline.filter import run_filter_pipeline
 from pipeline.orchestrator import process_article
 
+COST_GUARD_USD = 0.50
+
 
 def run_pipeline(extra_queries: list[str] = None):
     reset_run_stats()
-    print(f"[DEBUG] after reset_run_stats: {get_run_stats()}")
 
     fetcher = TavilyFetcher()
 
@@ -30,6 +32,15 @@ def run_pipeline(extra_queries: list[str] = None):
     results = []
     for article in survivors:
         results.append(process_article(article))
+
+        if get_run_stats()["estimated_cost_usd"] >= COST_GUARD_USD:
+            log_noise(
+                headline="COST GUARD TRIGGERED",
+                source_url="system",
+                gate_failed="cost_guard",
+                reason=f"Estimated cost ${get_run_stats()['estimated_cost_usd']:.4f} exceeded limit ${COST_GUARD_USD}"
+            )
+            break
 
     return {
         "fetched": len(combined),
