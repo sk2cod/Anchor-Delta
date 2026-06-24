@@ -8,9 +8,11 @@ from zoneinfo import ZoneInfo
 
 import streamlit as st
 
-from db.cards import get_active_cards
+from db.cards import get_active_cards, get_archived_cards, get_card_by_id
 from db.delta_events import get_delta_events_for_card
+from db.noise_log import get_noise_log_since
 from db.transmissions import get_transmission_for_card
+from pipeline.runner import run_pipeline
 
 st.set_page_config(
     page_title="Anchor & Delta",
@@ -135,15 +137,26 @@ def render_domain_tab(domain_key):
     cards = get_active_cards(domain=domain_key)
     if not cards:
         st.info(DOMAIN_PLACEHOLDER)
-        return
-    for card in cards:
-        render_card(
-            {
-                "card": card,
-                "delta_events": get_delta_events_for_card(card["id"]),
-                "transmission": get_transmission_for_card(card["id"]),
-            }
-        )
+    else:
+        for card in cards:
+            render_card(
+                {
+                    "card": card,
+                    "delta_events": get_delta_events_for_card(card["id"]),
+                    "transmission": get_transmission_for_card(card["id"]),
+                }
+            )
+
+    with st.expander("🗑️ Noise Log — last 24 hours", expanded=False):
+        noise = get_noise_log_since(hours=24)
+        domain_noise = [n for n in noise if True]  # show all noise for now
+        if not domain_noise:
+            st.caption("No noise logged in the last 24 hours.")
+        else:
+            for entry in domain_noise:
+                st.markdown(f"**{entry['gate_failed']}** — {entry['headline']}")
+                st.caption(f"{entry['reason']} · {entry['logged_at']}")
+                st.divider()
 
 
 (
@@ -188,8 +201,76 @@ with tab_australia:
 with tab_india:
     render_domain_tab(DOMAIN_KEYS["🌐 India"])
 
+def _format_run_timestamp(ts):
+    dt = datetime.fromisoformat(str(ts).replace("Z", "+00:00")).astimezone(
+        ZoneInfo("Australia/Sydney")
+    )
+    date_str = dt.strftime("%A, %d %B %Y")
+    time_str = dt.strftime("%I:%M %p").lstrip("0")
+    return f"{date_str} at {time_str}"
+
+
 with tab_pipeline:
-    st.info("Pipeline controls will appear here.")
+    st.header("⚙️ Pipeline Control")
+
+    all_noise = get_noise_log_since(hours=876000)
+    if not all_noise:
+        st.caption("No pipeline runs yet.")
+    else:
+        last_logged_at = max(entry["logged_at"] for entry in all_noise)
+        st.caption(f"Last run: {_format_run_timestamp(last_logged_at)}")
+
+    if st.button("🚀 Run Pipeline"):
+        with st.spinner("Fetching and filtering news sources..."):
+            run_results = run_pipeline()
+        st.session_state["last_run_results"] = run_results
+        st.success("Pipeline complete.")
+        st.rerun()
+
+    last_run_results = st.session_state.get("last_run_results")
+    if last_run_results:
+        results = last_run_results["results"]
+
+        col_fetched, col_survived, col_processed = st.columns(3)
+        col_fetched.metric("Fetched", last_run_results["fetched"])
+        col_survived.metric("Survived Filter", last_run_results["survived_filter"])
+        col_processed.metric("Total Processed", len(results))
+
+        status_counts = {"created": 0, "updated": 0, "noise": 0, "capped": 0, "error": 0}
+        for result in results:
+            status_counts[result["status"]] = status_counts.get(result["status"], 0) + 1
+        st.markdown(
+            " · ".join(f"**{status}**: {count}" for status, count in status_counts.items())
+        )
+
+        st.subheader("Cards Created or Updated")
+        created_or_updated = [r for r in results if r["status"] in ("created", "updated")]
+        if not created_or_updated:
+            st.caption("No cards created or updated in this run.")
+        else:
+            for result in created_or_updated:
+                card = get_card_by_id(result["card_id"])
+                if not card:
+                    continue
+                col_title, col_badge = st.columns([4, 1])
+                col_title.write(card["umbrella_title"])
+                col_badge.badge(result["status"])
 
 with tab_archive:
-    st.info("Archived cards will appear here.")
+    st.header("🗄️ Archive")
+
+    all_archived = get_archived_cards()
+    if not all_archived:
+        st.info("No archived cards yet.")
+    else:
+        for domain_label, domain_key in DOMAIN_KEYS.items():
+            domain_cards = get_archived_cards(domain=domain_key)
+            st.subheader(f"{domain_label} ({len(domain_cards)})")
+            for card in domain_cards:
+                render_card(
+                    {
+                        "card": card,
+                        "delta_events": get_delta_events_for_card(card["id"]),
+                        "transmission": get_transmission_for_card(card["id"]),
+                    }
+                )

@@ -26,6 +26,14 @@ def get_active_cards(domain=None):
     return response.data
 
 
+def get_archived_cards(domain=None):
+    query = supabase_client.table("cards").select("*").eq("is_archived", True)
+    if domain is not None:
+        query = query.eq("domain", domain)
+    response = query.order("last_delta_at", desc=True).execute()
+    return response.data
+
+
 def get_card_by_id(card_id):
     response = supabase_client.table("cards").select("*").eq("id", card_id).execute()
     return response.data[0] if response.data else None
