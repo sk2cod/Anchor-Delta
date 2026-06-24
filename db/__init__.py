@@ -3,8 +3,10 @@ from db.cards import (
     create_card,
     get_active_card_count,
     get_active_cards,
+    get_archived_cards,
     get_card_by_id,
     get_cards_due_for_archive,
+    hard_delete_all_cards,
     update_last_delta_at,
 )
 from db.delta_events import append_delta_event, get_delta_events_for_card
@@ -19,11 +21,13 @@ from db.transmissions import get_transmission_for_card, upsert_transmission
 __all__ = [
     "create_card",
     "get_active_cards",
+    "get_archived_cards",
     "get_card_by_id",
     "get_active_card_count",
     "update_last_delta_at",
     "archive_card",
     "get_cards_due_for_archive",
+    "hard_delete_all_cards",
     "append_delta_event",
     "get_delta_events_for_card",
     "upsert_transmission",

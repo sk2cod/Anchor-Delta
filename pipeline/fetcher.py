@@ -1,3 +1,4 @@
+import re
 from urllib.parse import urlparse
 
 from tavily import TavilyClient
@@ -29,6 +30,27 @@ def _is_social_media_url(url: str) -> bool:
     return any(domain in url for domain in SOCIAL_MEDIA_DOMAINS)
 
 
+_YEAR_PATTERN = re.compile(r"(19|20)\d{2}")
+_LONG_NUMERIC_ID_PATTERN = re.compile(r"\d{6,}")
+
+
+def _is_index_page(url: str) -> bool:
+    path = urlparse(url).path
+    segments = [segment for segment in path.split("/") if segment]
+
+    if len(segments) < 2:
+        return True
+
+    if _YEAR_PATTERN.search(path):
+        return False
+    if _LONG_NUMERIC_ID_PATTERN.search(path):
+        return False
+    if any(len(segment.split("-")) >= 4 for segment in segments):
+        return False
+
+    return True
+
+
 class TavilyFetcher:
     def __init__(self):
         self.client = TavilyClient(api_key=TAVILY_API_KEY)
@@ -56,7 +78,12 @@ class TavilyFetcher:
                 for result in response.get("results", []):
                     articles.append(self._to_article_dict(result, "top_stories"))
 
-        articles = [a for a in articles if not _is_social_media_url(a["url"])]
+        articles = [
+            a for a in articles
+            if not _is_social_media_url(a["url"])
+            and not _is_index_page(a["url"])
+            and len(a.get("content", "")) >= 300
+        ]
         return self._dedupe_by_url(articles)
 
     def fetch_dynamic_queries(self, active_cards):
@@ -72,7 +99,12 @@ class TavilyFetcher:
             for result in response.get("results", []):
                 articles.append(self._to_article_dict(result, card.get("domain")))
 
-        articles = [a for a in articles if not _is_social_media_url(a["url"])]
+        articles = [
+            a for a in articles
+            if not _is_social_media_url(a["url"])
+            and not _is_index_page(a["url"])
+            and len(a.get("content", "")) >= 300
+        ]
         return self._dedupe_by_url(articles)
 
     @staticmethod

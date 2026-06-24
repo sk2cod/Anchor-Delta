@@ -71,3 +71,19 @@ def get_cards_due_for_archive(days=14):
         .execute()
     )
     return response.data
+
+
+def hard_delete_all_cards() -> dict:
+    from db.client import supabase_client
+    d1 = supabase_client.table('delta_events').delete().neq('id', '00000000-0000-0000-0000-000000000000').execute()
+    d2 = supabase_client.table('transmissions').delete().neq('id', '00000000-0000-0000-0000-000000000000').execute()
+    d3 = supabase_client.table('cards').delete().neq('id', '00000000-0000-0000-0000-000000000000').execute()
+    d4 = supabase_client.table('noise_log').delete().neq('id', '00000000-0000-0000-0000-000000000000').execute()
+    d5 = supabase_client.table('processed_articles').delete().neq('id', '00000000-0000-0000-0000-000000000000').execute()
+    return {
+        "delta_events": len(d1.data),
+        "transmissions": len(d2.data),
+        "cards": len(d3.data),
+        "noise_log": len(d4.data),
+        "processed_articles": len(d5.data),
+    }

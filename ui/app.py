@@ -305,6 +305,14 @@ with st.sidebar:
                 col_title.write(card["umbrella_title"])
                 col_badge.badge(result["status"])
 
+    with st.expander("⚠️ Danger Zone", expanded=False):
+        st.caption("This will permanently delete all cards, delta events, transmissions, noise log, and processed articles. This cannot be undone.")
+        if st.button("🗑️ Hard Delete All Data", type="secondary"):
+            from db.cards import hard_delete_all_cards
+            result = hard_delete_all_cards()
+            st.success(f"Database wiped: {result}")
+            st.rerun()
+
     st.divider()
     st.header("🗄️ Archive")
 
