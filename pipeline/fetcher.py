@@ -16,12 +16,12 @@ FIXED_QUERIES = [
 ]
 
 RSS_FEEDS = [
-    {"url": "https://feeds.reuters.com/reuters/worldNews", "domain": "geopolitics"},
+    {"url": "https://news.google.com/rss/search?q=site:reuters.com+world+news&hl=en-AU&gl=AU&ceid=AU:en", "domain": "geopolitics"},
     {"url": "https://feeds.bbci.co.uk/news/world/rss.xml", "domain": "geopolitics"},
     {"url": "https://www.aljazeera.com/xml/rss/all.xml", "domain": "geopolitics"},
-    {"url": "https://feeds.reuters.com/reuters/topNews", "domain": "top_stories"},
+    {"url": "https://news.google.com/rss/search?q=site:reuters.com+top+news&hl=en-AU&gl=AU&ceid=AU:en", "domain": "top_stories"},
     {"url": "https://feeds.bbci.co.uk/news/rss.xml", "domain": "top_stories"},
-    {"url": "https://feeds.reuters.com/reuters/businessNews", "domain": "finance"},
+    {"url": "https://news.google.com/rss/search?q=site:reuters.com+business&hl=en-AU&gl=AU&ceid=AU:en", "domain": "finance"},
     {"url": "https://www.cnbc.com/id/100003114/device/rss/rss.html", "domain": "finance"},
     {"url": "https://www.ft.com/rss/home", "domain": "finance"},
     {"url": "https://www.technologyreview.com/feed/", "domain": "ai_tech"},
@@ -31,7 +31,7 @@ RSS_FEEDS = [
     {"url": "https://www.theguardian.com/australia-news/rss", "domain": "australia"},
     {"url": "https://www.smh.com.au/rss/feed.xml", "domain": "australia"},
     {"url": "https://www.sbs.com.au/news/feed", "domain": "australia"},
-    {"url": "https://www.afr.com/rss", "domain": "australia"},
+    {"url": "https://news.google.com/rss/search?q=site:afr.com&hl=en-AU&gl=AU&ceid=AU:en", "domain": "australia"},
     {"url": "https://www.thehindu.com/news/national/feeder/default.rss", "domain": "india"},
     {"url": "https://indianexpress.com/feed/", "domain": "india"},
     {"url": "https://www.livemint.com/rss/news", "domain": "india"},
@@ -55,10 +55,43 @@ def _is_social_media_url(url: str) -> bool:
 
 _YEAR_PATTERN = re.compile(r"(19|20)\d{2}")
 _LONG_NUMERIC_ID_PATTERN = re.compile(r"\d{6,}")
+_OPAQUE_ARTICLE_ID_PATTERN = re.compile(r"/articles/[a-zA-Z0-9]{8,}")
+
+TRUSTED_ARTICLE_DOMAINS = (
+    "bbc.com",
+    "bbc.co.uk",
+    "news.google.com",
+    "reuters.com",
+    "theguardian.com",
+    "smh.com.au",
+    "abc.net.au",
+    "thehindu.com",
+    "indianexpress.com",
+    "livemint.com",
+    "ft.com",
+    "cnbc.com",
+    "wired.com",
+    "arstechnica.com",
+    "technologyreview.com",
+    "aljazeera.com",
+    "sbs.com.au",
+)
 
 
 def _is_index_page(url: str) -> bool:
-    path = urlparse(url).path
+    parsed_url = urlparse(url)
+    domain = parsed_url.netloc.lower()
+    path = parsed_url.path
+
+    if any(trusted in domain for trusted in TRUSTED_ARTICLE_DOMAINS):
+        return False
+
+    if "/rss/articles/" in path:
+        return False
+
+    if _OPAQUE_ARTICLE_ID_PATTERN.search(path):
+        return False
+
     segments = [segment for segment in path.split("/") if segment]
 
     if len(segments) < 2:
@@ -159,7 +192,7 @@ class TavilyFetcher:
             a for a in articles
             if not _is_social_media_url(a["url"])
             and not _is_index_page(a["url"])
-            and len(a.get("content", "")) >= 300
+            and len(a.get("content", "")) >= 50
         ]
         return self._dedupe_by_url(articles)
 
