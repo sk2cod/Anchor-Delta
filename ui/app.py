@@ -86,9 +86,21 @@ today_str = datetime.now(ZoneInfo("Australia/Sydney")).strftime("%A, %d %B %Y")
 st.caption(today_str)
 
 
-def _chain_latex_to_text(chain_latex):
-    text = chain_latex.replace("\\longrightarrow", "→")
-    return re.sub(r"\\text\{([^}]*)\}", r"\1", text)
+def _chain_latex_to_text(latex: str) -> str:
+    import re
+    text = latex
+    text = text.replace(r'\longrightarrow', '→')
+    text = text.replace(r'\rightarrow', '→')
+    text = text.replace(r'\approx', '≈')
+    text = text.replace(r'\geq', '≥')
+    text = text.replace(r'\leq', '≤')
+    text = text.replace(r'\%', '%')
+    text = text.replace(r'\$', '$')
+    text = re.sub(r'\\text\{([^}]*)\}', r'\1', text)
+    text = re.sub(r'\\[a-zA-Z]+\{([^}]*)\}', r'\1', text)
+    text = re.sub(r'\\[a-zA-Z]+', '', text)
+    text = text.strip()
+    return text
 
 
 def render_card(card_data):
