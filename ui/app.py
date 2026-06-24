@@ -18,7 +18,7 @@ st.set_page_config(
     page_title="Anchor & Delta",
     page_icon="⚓",
     layout="wide",
-    initial_sidebar_state="collapsed",
+    initial_sidebar_state="expanded",
 )
 
 st.markdown(
@@ -76,6 +76,17 @@ st.markdown(
     footer {
         visibility: hidden;
     }
+
+    [data-testid="stToolbar"] { display: none !important; }
+    [data-testid="stDecoration"] { display: none !important; }
+    .stAppDeployButton { display: none !important; }
+    [data-baseweb="tab-list"] button[aria-label="scroll left"],
+    [data-baseweb="tab-list"] button[aria-label="scroll right"] {
+        display: none !important;
+    }
+
+    [data-testid="stSidebarCollapsedControl"] { display: none !important; }
+    [data-testid="collapsedControl"] { display: none !important; }
     </style>
     """,
     unsafe_allow_html=True,
@@ -103,15 +114,33 @@ def _chain_latex_to_text(latex: str) -> str:
     return text
 
 
+def _format_card_header(card):
+    last_updated = datetime.fromisoformat(str(card["last_delta_at"]).replace("Z", "+00:00")).astimezone(
+        ZoneInfo("Australia/Sydney")
+    )
+    now_sydney = datetime.now(ZoneInfo("Australia/Sydney"))
+    hours_ago = (now_sydney - last_updated).total_seconds() / 3600
+
+    if hours_ago < 3:
+        hours_int = max(1, round(hours_ago))
+        timestamp = f"updated {hours_int} hour{'s' if hours_int != 1 else ''} ago"
+        return f"🔴 NEW · {card['umbrella_title']} — {timestamp}"
+    elif hours_ago < 24:
+        time_str = last_updated.strftime("%I:%M %p").lstrip("0")
+        timestamp = f"updated today at {time_str}"
+        return f"🔴 NEW · {card['umbrella_title']} — {timestamp}"
+    else:
+        days_ago = max(1, int(hours_ago // 24))
+        timestamp = f"updated {days_ago} day{'s' if days_ago != 1 else ''} ago"
+        return f"📌 {card['umbrella_title']} — {timestamp}"
+
+
 def render_card(card_data):
     card = card_data["card"]
     delta_events = card_data["delta_events"]
     transmission = card_data["transmission"]
 
-    last_updated = datetime.fromisoformat(str(card["last_delta_at"]).replace("Z", "+00:00"))
-    last_updated_str = last_updated.astimezone(ZoneInfo("Australia/Sydney")).strftime("%d %b %Y")
-
-    with st.expander(f"📌 {card['umbrella_title']} — last updated {last_updated_str}"):
+    with st.expander(_format_card_header(card)):
         st.caption("THE CORE ANCHOR")
         st.markdown(
             f'<div class="ad-card">{card["anchor_text"]}</div>',
@@ -178,8 +207,6 @@ def render_domain_tab(domain_key):
     tab_ai_tech,
     tab_australia,
     tab_india,
-    tab_pipeline,
-    tab_archive,
 ) = st.tabs(
     [
         "🌍 Geopolitics",
@@ -188,8 +215,6 @@ def render_domain_tab(domain_key):
         "🤖 AI & Tech",
         "🌏 Australia",
         "🌐 India",
-        "⚙️ Pipeline",
-        "🗄️ Archive",
     ]
 )
 
@@ -222,8 +247,8 @@ def _format_run_timestamp(ts):
     return f"{date_str} at {time_str}"
 
 
-with tab_pipeline:
-    st.header("⚙️ Pipeline Control")
+with st.sidebar:
+    st.header("⚙️ Pipeline")
 
     all_noise = get_noise_log_since(hours=876000)
     if not all_noise:
@@ -232,9 +257,14 @@ with tab_pipeline:
         last_logged_at = max(entry["logged_at"] for entry in all_noise)
         st.caption(f"Last run: {_format_run_timestamp(last_logged_at)}")
 
+    user_query = st.text_input(
+        "Add a specific story to this run (optional)",
+        placeholder="e.g. NEET exam paper leak India",
+    )
+
     if st.button("🚀 Run Pipeline"):
         with st.spinner("Fetching and filtering news sources..."):
-            run_results = run_pipeline()
+            run_results = run_pipeline(extra_queries=[user_query] if user_query else None)
         st.session_state["last_run_results"] = run_results
         st.success("Pipeline complete.")
         st.rerun()
@@ -247,6 +277,13 @@ with tab_pipeline:
         col_fetched.metric("Fetched", last_run_results["fetched"])
         col_survived.metric("Survived Filter", last_run_results["survived_filter"])
         col_processed.metric("Total Processed", len(results))
+
+        run_stats = last_run_results.get("run_stats", {})
+        col_time, col_haiku, col_sonnet, col_cost = st.columns(4)
+        col_time.metric("Run time", f"{run_stats.get('elapsed_seconds', 0)}s")
+        col_haiku.metric("Haiku calls", run_stats.get("haiku_calls", 0))
+        col_sonnet.metric("Sonnet calls", run_stats.get("sonnet_calls", 0))
+        col_cost.metric("Est. cost", f"${run_stats.get('estimated_cost_usd', 0):.2f}")
 
         status_counts = {"created": 0, "updated": 0, "noise": 0, "capped": 0, "error": 0}
         for result in results:
@@ -268,21 +305,21 @@ with tab_pipeline:
                 col_title.write(card["umbrella_title"])
                 col_badge.badge(result["status"])
 
-with tab_archive:
+    st.divider()
     st.header("🗄️ Archive")
 
     all_archived = get_archived_cards()
     if not all_archived:
-        st.info("No archived cards yet.")
+        st.caption("No archived cards yet.")
     else:
         for domain_label, domain_key in DOMAIN_KEYS.items():
             domain_cards = get_archived_cards(domain=domain_key)
-            st.subheader(f"{domain_label} ({len(domain_cards)})")
-            for card in domain_cards:
-                render_card(
-                    {
-                        "card": card,
-                        "delta_events": get_delta_events_for_card(card["id"]),
-                        "transmission": get_transmission_for_card(card["id"]),
-                    }
-                )
+            with st.expander(f"{domain_label} ({len(domain_cards)})"):
+                for card in domain_cards:
+                    render_card(
+                        {
+                            "card": card,
+                            "delta_events": get_delta_events_for_card(card["id"]),
+                            "transmission": get_transmission_for_card(card["id"]),
+                        }
+                    )

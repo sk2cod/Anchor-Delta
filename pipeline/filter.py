@@ -7,7 +7,7 @@ from email.utils import parsedate_to_datetime
 from zoneinfo import ZoneInfo
 
 from db.noise_log import log_noise
-from db.processed_articles import is_headline_seen, is_url_seen, mark_article_processed
+from db.processed_articles import is_url_seen, mark_article_processed
 
 SYDNEY_TZ = ZoneInfo("Australia/Sydney")
 
@@ -16,19 +16,6 @@ with open(_KEYWORDS_PATH, "r", encoding="utf-8") as _f:
     _KEYWORDS = json.load(_f)
 
 BLOCKLIST = _KEYWORDS["blocklist"]
-
-ACTION_VERBS = [
-    "announced", "signed", "rejected", "imposed", "launched", "confirmed",
-    "denied", "warned", "sanctioned", "deployed", "agreed", "withdrew",
-    "condemned", "approved", "vetoed",
-]
-
-CONSEQUENCE_MARKERS = [
-    "as a result", "in response", "following the", "triggered by",
-    "led to", "forcing", "prompting",
-]
-
-_QUOTE_PATTERN = re.compile(r'"([^"]+)"')
 
 
 def _canonical_url(url):
@@ -113,15 +100,6 @@ def _gate_2_headline_dedup(article, seen_headlines, survivors):
             )
             return False
 
-    if is_headline_seen(headline_hash):
-        log_noise(
-            headline=article.get("title", ""),
-            source_url=article["url"],
-            gate_failed="gate_2",
-            reason="duplicate headline, shorter content",
-        )
-        return False
-
     seen_headlines[headline_hash] = {"article": article, "in_survivors": False}
     return True
 
@@ -172,28 +150,6 @@ def _gate_4_freshness_check(article):
     return article
 
 
-def _gate_5_signal_density(article):
-    content = article.get("content") or ""
-    content_lower = content.lower()
-
-    has_quote = any(
-        len(match.group(1).split()) >= 4 for match in _QUOTE_PATTERN.finditer(content)
-    )
-    has_action = any(verb in content_lower for verb in ACTION_VERBS)
-    has_consequence = any(marker in content_lower for marker in CONSEQUENCE_MARKERS)
-
-    if has_quote or has_action or has_consequence:
-        return True
-
-    log_noise(
-        headline=article.get("title", ""),
-        source_url=article["url"],
-        gate_failed="gate_5",
-        reason="no signal density: no quotes, actions, or consequences detected",
-    )
-    return False
-
-
 def run_filter_pipeline(articles):
     survivors = []
     seen_headlines = {}
@@ -211,9 +167,6 @@ def run_filter_pipeline(articles):
 
         article = _gate_4_freshness_check(article)
         if article is None:
-            continue
-
-        if not _gate_5_signal_density(article):
             continue
 
         survivors.append(article)

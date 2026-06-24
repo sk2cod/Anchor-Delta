@@ -1,17 +1,12 @@
 {
   "blocklist": [
-    "sport", "sports", "football", "soccer", "cricket", "tennis", "golf",
-    "nfl", "nba", "nhl", "mlb", "afl", "nrl", "rugby", "basketball",
-    "olympics", "formula 1", "f1", "grand prix", "ufc", "boxing",
-    "celebrity", "celebrities", "kardashian", "influencer", "reality tv",
-    "bachelor", "bachelorette", "big brother", "love island",
-    "entertainment", "box office", "movie review", "film review",
-    "music review", "album review", "concert", "tour dates",
-    "lifestyle", "wellness", "recipe", "cooking", "diet", "weight loss",
     "horoscope", "astrology", "zodiac",
-    "weather", "forecast", "temperature", "rainfall",
-    "fashion", "style", "beauty", "skincare", "makeup",
-    "travel tips", "holiday deals", "best hotels", "vacation"
+    "recipe", "cooking", "meal prep",
+    "fashion", "skincare", "makeup", "beauty tips",
+    "celebrity gossip", "reality tv", "bachelor",
+    "sports scores", "match results", "league table",
+    "weather forecast", "temperature today",
+    "travel deals", "holiday packages", "best hotels"
   ],
   "priority_sources": [
     "reuters.com", "apnews.com", "bbc.com", "bbc.co.uk",

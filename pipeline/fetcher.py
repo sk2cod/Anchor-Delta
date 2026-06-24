@@ -4,31 +4,59 @@ from tavily import TavilyClient
 
 from config import TAVILY_API_KEY
 
-FIXED_QUERIES = {
-    "geopolitics": "major geopolitical developments today",
-    "top_stories": "top world news stories today",
-    "finance": "global financial markets and economic news today",
-    "ai_tech": "artificial intelligence and technology news today",
-    "australia": "Australia politics economy news today",
-    "india": "India politics economy business news today",
-}
+FIXED_QUERIES = [
+    {"query": "geopolitics conflict diplomacy news today", "domain": "geopolitics"},
+    {"query": "global financial markets economy news today", "domain": "finance"},
+    {"query": "artificial intelligence technology news today", "domain": "ai_tech"},
+    {"query": "Australia news today", "domain": "australia"},
+    {"query": "India news today", "domain": "india"},
+    {"query": "top world news breaking stories today", "domain": "top_stories"},
+]
+
+SOCIAL_MEDIA_DOMAINS = (
+    "facebook.com",
+    "twitter.com",
+    "x.com",
+    "instagram.com",
+    "youtube.com",
+    "tiktok.com",
+    "reddit.com",
+    "linkedin.com",
+)
+
+
+def _is_social_media_url(url: str) -> bool:
+    return any(domain in url for domain in SOCIAL_MEDIA_DOMAINS)
 
 
 class TavilyFetcher:
     def __init__(self):
         self.client = TavilyClient(api_key=TAVILY_API_KEY)
 
-    def fetch_fixed_queries(self):
+    def fetch_fixed_queries(self, extra_queries: list[str] = None):
         articles = []
-        for domain, query in FIXED_QUERIES.items():
+        for entry in FIXED_QUERIES:
             response = self.client.search(
-                query=query,
+                query=entry["query"],
                 search_depth="advanced",
-                max_results=10,
+                max_results=20,
                 topic="news",
             )
             for result in response.get("results", []):
-                articles.append(self._to_article_dict(result, domain))
+                articles.append(self._to_article_dict(result, entry["domain"]))
+
+        if extra_queries:
+            for query in extra_queries:
+                response = self.client.search(
+                    query=query,
+                    search_depth="advanced",
+                    max_results=5,
+                    topic="news",
+                )
+                for result in response.get("results", []):
+                    articles.append(self._to_article_dict(result, "top_stories"))
+
+        articles = [a for a in articles if not _is_social_media_url(a["url"])]
         return self._dedupe_by_url(articles)
 
     def fetch_dynamic_queries(self, active_cards):
@@ -43,6 +71,8 @@ class TavilyFetcher:
             )
             for result in response.get("results", []):
                 articles.append(self._to_article_dict(result, card.get("domain")))
+
+        articles = [a for a in articles if not _is_social_media_url(a["url"])]
         return self._dedupe_by_url(articles)
 
     @staticmethod
