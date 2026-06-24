@@ -1,0 +1,8 @@
+anthropic
+supabase
+tavily-python
+streamlit
+pydantic
+python-dotenv
+httpx
+apscheduler
