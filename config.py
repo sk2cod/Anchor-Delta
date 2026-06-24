@@ -23,3 +23,16 @@ if _missing:
         f"Missing required environment variable(s): {', '.join(_missing)}. "
         "Set them in your .env file."
     )
+
+VALID_DOMAINS = [
+    "geopolitics",
+    "top_stories",
+    "finance",
+    "ai_tech",
+    "australia",
+    "india",
+]
+
+MAX_ACTIVE_CARDS = 10
+ARCHIVE_AFTER_DAYS = 14
+SYDNEY_TZ = "Australia/Sydney"
