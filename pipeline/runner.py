@@ -7,14 +7,16 @@ from pipeline.orchestrator import process_article
 
 def run_pipeline(extra_queries: list[str] = None):
     reset_run_stats()
+    print(f"[DEBUG] after reset_run_stats: {get_run_stats()}")
 
     fetcher = TavilyFetcher()
 
+    rss_articles = fetcher.fetch_rss_articles()
     fixed_articles = fetcher.fetch_fixed_queries(extra_queries=extra_queries)
     active_cards = get_active_cards()
     dynamic_articles = fetcher.fetch_dynamic_queries(active_cards)
 
-    combined = fixed_articles + dynamic_articles
+    combined = rss_articles + fixed_articles + dynamic_articles
     seen_urls = set()
     deduped = []
     for article in combined:

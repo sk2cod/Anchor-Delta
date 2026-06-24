@@ -16,6 +16,7 @@ from pipeline.engine import (
     compose_delta_update,
     compose_new_card,
     extract_article,
+    get_run_stats,
     route_article,
 )
 
@@ -26,6 +27,7 @@ def process_article(article):
     try:
         active_cards = get_active_cards()
         route_result = route_article(article, active_cards)
+        print(f"[DEBUG] after route_article: {get_run_stats()}")
 
         if route_result.classification == "noise":
             log_noise(
@@ -40,7 +42,9 @@ def process_article(article):
             existing_card = get_card_by_id(route_result.card_id)
             delta_history = get_delta_events_for_card(route_result.card_id)
             extraction = extract_article(article)
+            print(f"[DEBUG] after extract_article: {get_run_stats()}")
             result = compose_delta_update(article, extraction, existing_card, delta_history)
+            print(f"[DEBUG] after compose_delta_update: {get_run_stats()}")
 
             append_delta_event(
                 card_id=route_result.card_id,
@@ -71,7 +75,9 @@ def process_article(article):
                 return {"status": "capped", "article_title": article["title"]}
 
             extraction = extract_article(article)
+            print(f"[DEBUG] after extract_article: {get_run_stats()}")
             result = compose_new_card(article, extraction, domain=article["query_domain"])
+            print(f"[DEBUG] after compose_new_card: {get_run_stats()}")
 
             if result.domain not in VALID_DOMAINS:
                 raise ValueError(f"LLM returned invalid domain: {result.domain}")
@@ -98,4 +104,10 @@ def process_article(article):
 
     except Exception as e:
         logger.error("process_article failed: %s", e, exc_info=True)
+        log_noise(
+            headline=article.get("title", "unknown"),
+            source_url=article.get("url", "unknown"),
+            gate_failed="error",
+            reason=str(e)
+        )
         return {"status": "error", "reason": str(e), "article_title": article.get("title", "unknown")}
