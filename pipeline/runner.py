@@ -1,6 +1,7 @@
 from db.cards import get_active_cards
 from pipeline.fetcher import TavilyFetcher
 from pipeline.filter import run_filter_pipeline
+from pipeline.orchestrator import process_article
 
 
 def run_pipeline():
@@ -19,4 +20,14 @@ def run_pipeline():
         seen_urls.add(article["url"])
         deduped.append(article)
 
-    return run_filter_pipeline(deduped)
+    survivors = run_filter_pipeline(deduped)
+
+    results = []
+    for article in survivors:
+        results.append(process_article(article))
+
+    return {
+        "fetched": len(combined),
+        "survived_filter": len(survivors),
+        "results": results,
+    }

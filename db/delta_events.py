@@ -1,7 +1,12 @@
+from datetime import date
+
 from db.client import supabase_client
 
 
 def append_delta_event(card_id, event_date, headline, what_happened, dialogue):
+    if isinstance(event_date, date):
+        event_date = event_date.isoformat()
+
     response = (
         supabase_client.table("delta_events")
         .insert(
