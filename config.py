@@ -33,7 +33,8 @@ VALID_DOMAINS = [
     "india",
 ]
 
-MAX_ACTIVE_CARDS = 10
+# BOOTSTRAP MODE: temporarily raised to 20 — change back to 10 after bootstrap run completes
+MAX_ACTIVE_CARDS = 20
 ARCHIVE_AFTER_DAYS = 14
 SYDNEY_TZ = "Australia/Sydney"
 
