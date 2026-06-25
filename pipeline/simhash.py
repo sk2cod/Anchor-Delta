@@ -4,7 +4,7 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
 SIMHASH_THRESHOLD = 20
-TFIDF_THRESHOLD = 0.2
+TFIDF_THRESHOLD = 0.25
 
 def compute_url_hash(url: str) -> str:
     return hashlib.sha256(url.strip().lower().encode()).hexdigest()
