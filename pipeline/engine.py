@@ -295,7 +295,8 @@ def _call_structured(model, system_prompt, user_content, response_model):
     )
 
     try:
-        preprocessed_input = _preprocess_input(tool_use_block.input)
+        raw_input = dict(tool_use_block.input)
+        preprocessed_input = _preprocess_input(raw_input)
         return response, response_model.model_validate(preprocessed_input)
     except ValidationError as exc:
         logger.error("Structured output validation failed for %s: %s", tool_name, exc)
