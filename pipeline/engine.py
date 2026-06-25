@@ -245,8 +245,11 @@ Respond only with the structured output. No prose outside the schema.
 """
 
 
+SCALAR_STRING_FIELDS = {'event_headline', 'what_happened', 'anchor_text', 'umbrella_title', 'chain_latex', 'nodes_markdown', 'reason'}
+
+
 def _preprocess_input(data: dict) -> dict:
-    """Parse any string fields that should be lists or dicts."""
+    """Parse any string fields that should be lists or dicts, and collapse list values that should be scalar strings."""
     result = {}
     for key, value in data.items():
         if isinstance(value, str) and value.strip().startswith(('[', '{')):
@@ -254,6 +257,13 @@ def _preprocess_input(data: dict) -> dict:
                 result[key] = json.loads(value)
             except (json.JSONDecodeError, ValueError):
                 result[key] = value
+        elif isinstance(value, list) and key in SCALAR_STRING_FIELDS:
+            if len(value) == 1:
+                result[key] = str(value[0])
+            elif len(value) > 1:
+                result[key] = " | ".join(str(v) for v in value)
+            else:
+                result[key] = ""
         else:
             result[key] = value
     return result
