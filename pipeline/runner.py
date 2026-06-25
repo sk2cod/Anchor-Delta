@@ -5,8 +5,8 @@ from pipeline.fetcher import TavilyFetcher
 from pipeline.filter import run_filter_pipeline
 from pipeline.orchestrator import process_article
 
-# BOOTSTRAP MODE: temporarily raised to 1.50 — change back to 0.60 after bootstrap run completes
-COST_GUARD_USD = 1.50
+# BOOTSTRAP MODE: temporarily raised to 0.80 for top-up run — change back to 0.60 after bootstrap run completes
+COST_GUARD_USD = 0.80
 
 
 def run_pipeline(extra_queries: list[str] = None, progress_callback=None):

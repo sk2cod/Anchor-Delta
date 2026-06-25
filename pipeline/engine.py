@@ -117,7 +117,17 @@ Classify based on story CONTENT not the source or query that fetched it. Apply t
 
 GEOPOLITICS: Hard power dynamics, strategic friction, sanctions, military operations, diplomatic developments that alter the global status quo, resource nationalism, supply chain geopolitics, international trade disputes, critical mineral nationalism, secondary sanctions. Avoid routine diplomatic boilerplate or daily war updates that do not shift structural reality.
 
-FINANCE: Systemic market pricing, capital allocation shifts, monetary policy logic, central bank framework decisions, sovereign credit risk, long-term bond yield cycles, currency crises, trade economics with market consequence, global liquidity trends, risk premium shifts. Reject pure corporate stock price movements unless they have systemic market implications.
+FINANCE: Systemic market pricing, capital allocation shifts, monetary policy logic, central bank framework decisions, sovereign credit risk, long-term bond yield cycles, currency crises, trade economics with market consequence, global liquidity trends, risk premium shifts.
+
+Examples that must pass as Finance signal:
+- Federal Reserve stress tests, capital requirement changes, bank regulatory overhauls
+- Central bank rate decisions, forward guidance shifts, balance sheet changes
+- Major institutional positioning signals (JPMorgan, Goldman, BlackRock on market structure)
+- Sovereign debt crises, currency interventions, IMF/World Bank structural decisions
+- Commodity price movements with macro consequence (oil, gold, copper at structural inflection points)
+- Trade deal economics with market consequence (tariffs, sanctions with capital flow impact)
+
+Reject: pure daily stock price movements, routine earnings with no macro consequence, consumer retail sales without systemic signal.
 
 AI_TECH: Sovereign compute infrastructure, semiconductor supply chains and manufacturing nodes, AI governance and regulation, hardware export restrictions, national security implications of AI, legislative constraints on technology, strategic AI infrastructure investments. Reject consumer app feature updates and routine product launches.
 
