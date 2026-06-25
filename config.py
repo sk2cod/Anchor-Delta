@@ -40,4 +40,4 @@ SYDNEY_TZ = "Australia/Sydney"
 # Pipeline freshness window
 # Set to 168 for initial bootstrap run (7 days of articles)
 # Set back to 48 for daily upkeep runs
-FRESHNESS_HOURS = 48
+FRESHNESS_HOURS = 168

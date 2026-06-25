@@ -127,6 +127,12 @@ INDIA: Any story directly involving or impacting India — domestic growth, infr
 
 TOP_STORIES: Use ONLY when no single domain above is clearly dominant AND the event is a genuine global systemic shock — a cross-domain crisis affecting multiple sectors simultaneously, a black swan event, or a development so structurally significant it reshapes multiple domains at once. Do not use TOP_STORIES as a catch-all for stories that fit elsewhere.
 
+Examples that must route to TOP_STORIES:
+- Major earthquakes (magnitude 6+) in any country with significant casualties or infrastructure damage
+- Major natural disasters affecting oil-producing nations (Venezuela, Iran, Iraq, Saudi Arabia, Nigeria) — these have direct market consequence
+- Cross-border humanitarian crises affecting global aid flows
+- Black swan events affecting multiple asset classes simultaneously
+
 ---
 
 STEP 3 — CARD ROUTING
