@@ -207,7 +207,25 @@ def _gate_4_freshness_check(article):
     return article
 
 
-def run_filter_pipeline(articles):
+def run_filter_pipeline(articles, fetcher=None):
+    # Gate 3 and Gate 4 first — cheap checks, no API calls or DB lookups,
+    # so obvious noise is eliminated before paying for body enrichment.
+    cheap_survivors = []
+    for article in articles:
+        if not _gate_3_keyword_filter(article):
+            continue
+
+        article = _gate_4_freshness_check(article)
+        if article is None:
+            continue
+
+        cheap_survivors.append(article)
+
+    if fetcher is not None:
+        cheap_survivors = fetcher.enrich_articles_with_body(cheap_survivors)
+
+    # Gate 1 and Gate 2 run on enriched content, so SimHash/TF-IDF dedup
+    # sees full article bodies rather than RSS teaser text.
     survivors = []
     seen_simhashes = []
     seen_texts = []
@@ -215,18 +233,11 @@ def run_filter_pipeline(articles):
     seen_articles = []
     seen_urls = set()
 
-    for article in articles:
+    for article in cheap_survivors:
         if not _gate_1_url_uniqueness(article, seen_urls):
             continue
 
         if not _gate_2_dedup(article, seen_simhashes, seen_texts, seen_lengths, seen_articles, survivors):
-            continue
-
-        if not _gate_3_keyword_filter(article):
-            continue
-
-        article = _gate_4_freshness_check(article)
-        if article is None:
             continue
 
         survivors.append(article)

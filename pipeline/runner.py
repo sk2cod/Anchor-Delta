@@ -20,9 +20,6 @@ def run_pipeline(extra_queries: list[str] = None, progress_callback=None):
 
     combined = rss_articles + fixed_articles + dynamic_articles
 
-    # Enrich articles with full body text
-    combined = fetcher.enrich_articles_with_body(combined)
-
     seen_urls = set()
     deduped = []
     for article in combined:
@@ -31,7 +28,7 @@ def run_pipeline(extra_queries: list[str] = None, progress_callback=None):
         seen_urls.add(article["url"])
         deduped.append(article)
 
-    survivors = run_filter_pipeline(deduped)
+    survivors = run_filter_pipeline(deduped, fetcher=fetcher)
 
     results = []
     for article in survivors:
