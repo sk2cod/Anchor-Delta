@@ -123,6 +123,21 @@ OUTPUT RULES:
 - card_id: populated only when classification == "existing_card"
 - confidence: "high" | "medium" | "low"
 - reason: one sentence explaining the routing decision
+
+DOMAIN ASSIGNMENT RULE:
+When classification is "new_frame", you must assign the correct domain based on the STORY CONTENT, not the source or query that fetched it. Ignore the article's query_domain field entirely.
+
+Domain definitions:
+- geopolitics: international relations, wars, diplomacy, sanctions, military, treaties, UN, foreign policy
+- top_stories: major breaking global events that do not fit a single domain — natural disasters, global summits, cross-domain crises
+- finance: markets, central banks, interest rates, inflation, corporate earnings with macro consequence, trade economics
+- ai_tech: artificial intelligence, semiconductors, cybersecurity, space technology, frontier tech policy
+- australia: any story primarily about Australia — politics, economy, business, society, security
+- india: any story primarily about India — politics, economy, business, society, security
+
+A story about US tariffs belongs in geopolitics or finance — not india — even if it was fetched by an India query.
+A story about RBI interest rates belongs in india — even if fetched by a finance query.
+A story about ASIO belongs in australia — even if fetched by a geopolitics query.
 - Respond only with the structured output. No prose outside the schema.
 """
 
@@ -179,6 +194,21 @@ Write the LaTeX causal chain: \\text{A} \\longrightarrow \\text{B} \\longrightar
 Then write the domino nodes as a numbered markdown list. Each node has a bold title followed by 2-4 sentences of prose explanation. No bullet points inside nodes. Prose only.
 The chain must feel revelatory — the reader should feel they now understand why this story was structurally inevitable.
 
+DOMAIN ASSIGNMENT RULE:
+Assign domain based on the STORY CONTENT, not the source or query that fetched it. Use these definitions:
+- geopolitics: international relations, wars, diplomacy, sanctions, military, treaties, UN, foreign policy
+- top_stories: major breaking global events that do not fit a single domain — natural disasters, global summits, cross-domain crises
+- finance: markets, central banks, interest rates, inflation, corporate earnings with macro consequence, trade economics
+- ai_tech: artificial intelligence, semiconductors, cybersecurity, space technology, frontier tech policy
+- australia: any story primarily about Australia — politics, economy, business, society, security
+- india: any story primarily about India — politics, economy, business, society, security
+
+Examples:
+- US tariffs story fetched by India query → finance or geopolitics, NOT india
+- RBI interest rates fetched by finance query → india
+- ASIO security alert fetched by geopolitics query → australia
+- Iran nuclear talks fetched by top_stories query → geopolitics
+
 QUALITY TEST — before finalising, ask yourself:
 Could a person read this card in two minutes and walk into any room and hold a fluid conversation at all three levels — quoting the sharp exchange, explaining the tactical play, and articulating the structural logic underneath? If no, rewrite until yes.
 
@@ -215,6 +245,20 @@ Respond only with the structured output. No prose outside the schema.
 """
 
 
+def _preprocess_input(data: dict) -> dict:
+    """Parse any string fields that should be lists or dicts."""
+    result = {}
+    for key, value in data.items():
+        if isinstance(value, str) and value.strip().startswith(('[', '{')):
+            try:
+                result[key] = json.loads(value)
+            except (json.JSONDecodeError, ValueError):
+                result[key] = value
+        else:
+            result[key] = value
+    return result
+
+
 def _call_structured(model, system_prompt, user_content, response_model):
     # The SDK has no native pydantic-parse helper, so structured output is
     # obtained by forcing a tool call whose input_schema is the model's
@@ -241,7 +285,8 @@ def _call_structured(model, system_prompt, user_content, response_model):
     )
 
     try:
-        return response, response_model.model_validate(tool_use_block.input)
+        preprocessed_input = _preprocess_input(tool_use_block.input)
+        return response, response_model.model_validate(preprocessed_input)
     except ValidationError as exc:
         logger.error("Structured output validation failed for %s: %s", tool_name, exc)
         raise

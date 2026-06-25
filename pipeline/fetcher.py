@@ -6,22 +6,12 @@ from tavily import TavilyClient
 
 from config import TAVILY_API_KEY
 
-FIXED_QUERIES = [
-    {"query": "geopolitics conflict diplomacy news today", "domain": "geopolitics"},
-    {"query": "global financial markets economy news today", "domain": "finance"},
-    {"query": "artificial intelligence technology news today", "domain": "ai_tech"},
-    {"query": "Australia news today", "domain": "australia"},
-    {"query": "India news today", "domain": "india"},
-    {"query": "top world news breaking stories today", "domain": "top_stories"},
-]
-
 RSS_FEEDS = [
-    {"url": "https://news.google.com/rss/search?q=site:reuters.com+world+news&hl=en-AU&gl=AU&ceid=AU:en", "domain": "geopolitics"},
     {"url": "https://feeds.bbci.co.uk/news/world/rss.xml", "domain": "geopolitics"},
+    {"url": "https://rss.nytimes.com/services/xml/rss/nyt/World.xml", "domain": "geopolitics"},
     {"url": "https://www.aljazeera.com/xml/rss/all.xml", "domain": "geopolitics"},
-    {"url": "https://news.google.com/rss/search?q=site:reuters.com+top+news&hl=en-AU&gl=AU&ceid=AU:en", "domain": "top_stories"},
     {"url": "https://feeds.bbci.co.uk/news/rss.xml", "domain": "top_stories"},
-    {"url": "https://news.google.com/rss/search?q=site:reuters.com+business&hl=en-AU&gl=AU&ceid=AU:en", "domain": "finance"},
+    {"url": "https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml", "domain": "top_stories"},
     {"url": "https://www.cnbc.com/id/100003114/device/rss/rss.html", "domain": "finance"},
     {"url": "https://www.ft.com/rss/home", "domain": "finance"},
     {"url": "https://www.technologyreview.com/feed/", "domain": "ai_tech"},
@@ -31,7 +21,7 @@ RSS_FEEDS = [
     {"url": "https://www.theguardian.com/australia-news/rss", "domain": "australia"},
     {"url": "https://www.smh.com.au/rss/feed.xml", "domain": "australia"},
     {"url": "https://www.sbs.com.au/news/feed", "domain": "australia"},
-    {"url": "https://news.google.com/rss/search?q=site:afr.com&hl=en-AU&gl=AU&ceid=AU:en", "domain": "australia"},
+    {"url": "https://www.afr.com/rss/feed.xml", "domain": "australia"},
     {"url": "https://www.thehindu.com/news/national/feeder/default.rss", "domain": "india"},
     {"url": "https://indianexpress.com/feed/", "domain": "india"},
     {"url": "https://www.livemint.com/rss/news", "domain": "india"},
@@ -111,18 +101,8 @@ class TavilyFetcher:
     def __init__(self):
         self.client = TavilyClient(api_key=TAVILY_API_KEY)
 
-    def fetch_fixed_queries(self, extra_queries: list[str] = None):
+    def fetch_user_queries(self, extra_queries: list[str] = None):
         articles = []
-        for entry in FIXED_QUERIES:
-            response = self.client.search(
-                query=entry["query"],
-                search_depth="advanced",
-                max_results=20,
-                topic="news",
-                days=1,
-            )
-            for result in response.get("results", []):
-                articles.append(self._to_article_dict(result, entry["domain"]))
 
         if extra_queries:
             for query in extra_queries:

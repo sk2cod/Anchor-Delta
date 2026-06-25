@@ -5,7 +5,7 @@ from pipeline.fetcher import TavilyFetcher
 from pipeline.filter import run_filter_pipeline
 from pipeline.orchestrator import process_article
 
-COST_GUARD_USD = 0.50
+COST_GUARD_USD = 0.60
 
 
 def run_pipeline(extra_queries: list[str] = None):
@@ -14,7 +14,7 @@ def run_pipeline(extra_queries: list[str] = None):
     fetcher = TavilyFetcher()
 
     rss_articles = fetcher.fetch_rss_articles()
-    fixed_articles = fetcher.fetch_fixed_queries(extra_queries=extra_queries)
+    fixed_articles = fetcher.fetch_user_queries(extra_queries=extra_queries)
     active_cards = get_active_cards()
     dynamic_articles = fetcher.fetch_dynamic_queries(active_cards)
 
