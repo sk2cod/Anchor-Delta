@@ -30,9 +30,9 @@ RSS_FEEDS = [
     {"url": "https://www.smh.com.au/rss/feed.xml", "domain": "australia"},
     {"url": "https://www.sbs.com.au/news/feed", "domain": "australia"},
     {"url": "https://www.afr.com/rss/feed.xml", "domain": "australia"},
+    {"url": "https://www.thehindu.com/business/feeder/default.rss", "domain": "india"},
     {"url": "https://www.thehindu.com/news/national/feeder/default.rss", "domain": "india"},
-    {"url": "https://indianexpress.com/feed/", "domain": "india"},
-    {"url": "https://www.livemint.com/rss/news", "domain": "india"},
+    {"url": "https://indianexpress.com/section/business/feed/", "domain": "india"},
 ]
 
 SOCIAL_MEDIA_DOMAINS = (
