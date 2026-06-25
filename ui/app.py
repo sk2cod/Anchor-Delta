@@ -141,9 +141,21 @@ def render_card(card_data):
     delta_events = card_data["delta_events"]
     transmission = card_data["transmission"]
 
+    latest = delta_events[0] if delta_events else None
+    older = delta_events[1:] if delta_events else []
+
     with st.expander(_format_card_header(card)):
-        if delta_events and delta_events[0].get('tldr'):
-            st.caption(f"_{delta_events[0]['tldr']}_")
+        if latest and latest.get('tldr'):
+            st.caption(f"_{latest['tldr']}_")
+
+        st.caption("⚡ LATEST")
+        if latest:
+            st.subheader(f"{latest['event_date']} — {latest['headline']}")
+            if latest.get('tldr'):
+                st.markdown(f"*{latest['tldr']}*")
+            st.write(latest["what_happened"])
+            for turn in latest.get("dialogue") or []:
+                st.markdown(f'> **{turn["speaker"]}:** *"{turn["quote"]}"*')
 
         st.caption("THE CORE ANCHOR")
         st.markdown(
@@ -151,16 +163,19 @@ def render_card(card_data):
             unsafe_allow_html=True,
         )
 
-        st.caption("⚡ LIVE STATUS TRACKER")
-        for index, event in enumerate(delta_events):
-            st.subheader(f"{event['event_date']} — {event['headline']}")
-            if event.get('tldr'):
-                st.markdown(f"*{event['tldr']}*")
-            st.write(event["what_happened"])
-            for turn in event.get("dialogue") or []:
-                st.markdown(f'> **{turn["speaker"]}:** *"{turn["quote"]}"*')
-            if index < len(delta_events) - 1:
-                st.divider()
+        st.divider()
+
+        if older:
+            with st.expander("📖 Previous Chapters", expanded=False):
+                for index, event in enumerate(older):
+                    st.subheader(f"{event['event_date']} — {event['headline']}")
+                    if event.get('tldr'):
+                        st.markdown(f"*{event['tldr']}*")
+                    st.write(event["what_happened"])
+                    for turn in event.get("dialogue") or []:
+                        st.markdown(f'> **{turn["speaker"]}:** *"{turn["quote"]}"*')
+                    if index < len(older) - 1:
+                        st.divider()
 
         st.caption("🧩 THE CONCEPTUAL TRANSMISSION")
         if transmission:

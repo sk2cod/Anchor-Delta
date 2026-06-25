@@ -175,6 +175,8 @@ Extract only the primary event that is the direct subject of this article. Do no
 
 The article's own published date is the authoritative event date. Use it as event_date unless the article explicitly reports on a specific named event that occurred on a different date today or yesterday.
 
+The article's published_date is provided in the input. Use it as event_date. If published_date is 'unknown', use today's date. Never use dates found in the article body as historical background context.
+
 Never assign dates from background context sections. Never extract quotes from people who are being referenced historically rather than speaking in the context of this article's primary event.
 
 EXTRACTION RULES:
@@ -260,6 +262,8 @@ Each node must:
 
 The chain should feel like a revelation. By the end, the reader should think: "I never understood why this worked this way — now I do."
 
+EVENT DATE RULE: Use the event_date from the extraction data exactly as provided. Never change it. Never use dates mentioned in background context. If the extraction date looks wrong (e.g. a year in the past), use today's date instead.
+
 QUALITY TEST:
 Read it back. Does it sound like a smart friend explaining something fascinating over dinner? Does every sentence assume the reader needs it explained from scratch? Does it make the reader feel smarter? If it sounds like a report or a textbook — rewrite it.
 
@@ -330,6 +334,8 @@ TRANSMISSION UPDATE RULE
 Set transmission_needs_update to True ONLY if the structural causal logic of the story has fundamentally shifted — not simply because new events arrived. New events update Layer 2 only. The transmission chain is durable across weeks. If transmission_needs_update is True — rewrite the full chain and nodes in the same voice: zero specialist knowledge assumed, every concept explained from scratch.
 
 ---
+
+EVENT DATE RULE: Use the event_date from the extraction data exactly as provided. Never change it. Never use dates mentioned in background context. If the extraction date looks wrong (e.g. a year in the past), use today's date instead.
 
 QUALITY TEST:
 Read it back. Does the new entry feel like the next chapter in a gripping story? Does it connect naturally to what came before? Does it assume nothing and explain everything? Does it make the reader feel smarter?
@@ -431,7 +437,10 @@ def route_article(article, active_cards):
 
 
 def extract_article(article):
-    user_content = json.dumps({"content": article.get("content", "")})
+    user_content = json.dumps({
+        "published_date": article.get("published_date", "unknown"),
+        "content": article.get("content", "")
+    })
     response, result = _call_structured(
         EXTRACT_MODEL, EXTRACT_SYSTEM_PROMPT, user_content, ExtractionResult
     )
