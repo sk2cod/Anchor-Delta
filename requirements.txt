@@ -9,3 +9,5 @@ apscheduler
 feedparser
 scikit-learn
 simhash
+beautifulsoup4
+lxml

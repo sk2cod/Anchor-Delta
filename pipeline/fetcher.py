@@ -1,17 +1,22 @@
 import re
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from urllib.parse import urlparse
 
 import feedparser
+import httpx
+from bs4 import BeautifulSoup
 from tavily import TavilyClient
 
 from config import TAVILY_API_KEY
 
 RSS_FEEDS = [
     {"url": "https://feeds.bbci.co.uk/news/world/rss.xml", "domain": "geopolitics"},
-    {"url": "https://rss.nytimes.com/services/xml/rss/nyt/World.xml", "domain": "geopolitics"},
     {"url": "https://www.aljazeera.com/xml/rss/all.xml", "domain": "geopolitics"},
+    {"url": "https://www.theguardian.com/world/rss", "domain": "geopolitics"},
+    {"url": "https://rss.dw.com/rss/en-all", "domain": "geopolitics"},
+    {"url": "https://www.france24.com/en/rss", "domain": "geopolitics"},
     {"url": "https://feeds.bbci.co.uk/news/rss.xml", "domain": "top_stories"},
-    {"url": "https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml", "domain": "top_stories"},
+    {"url": "https://www.theguardian.com/international/rss", "domain": "top_stories"},
     {"url": "https://www.cnbc.com/id/100003114/device/rss/rss.html", "domain": "finance"},
     {"url": "https://www.ft.com/rss/home", "domain": "finance"},
     {"url": "https://www.technologyreview.com/feed/", "domain": "ai_tech"},
@@ -95,6 +100,55 @@ def _is_index_page(url: str) -> bool:
         return False
 
     return True
+
+
+def fetch_article_body(url: str, existing_content: str = "", timeout: int = 5) -> str:
+    """
+    Fetch full article body from URL.
+    Returns full text if longer than existing_content, otherwise returns existing_content.
+    """
+    try:
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "Accept-Language": "en-US,en;q=0.5",
+        }
+        response = httpx.get(url, headers=headers, timeout=timeout, follow_redirects=True)
+        if response.status_code != 200:
+            return existing_content
+
+        soup = BeautifulSoup(response.text, "lxml")
+
+        # Remove noise elements
+        for tag in soup(["script", "style", "nav", "header", "footer", "aside", "figure", "iframe", "noscript"]):
+            tag.decompose()
+
+        # Try article-specific selectors first
+        article_selectors = [
+            "article", "[role='main']", ".article-body", ".story-body",
+            ".post-content", ".entry-content", ".article-content", "main"
+        ]
+        body_text = ""
+        for selector in article_selectors:
+            element = soup.select_one(selector)
+            if element:
+                paragraphs = element.find_all("p")
+                body_text = " ".join(p.get_text(strip=True) for p in paragraphs if len(p.get_text(strip=True)) > 30)
+                if len(body_text) > 200:
+                    break
+
+        # Fallback to all paragraphs
+        if len(body_text) < 200:
+            paragraphs = soup.find_all("p")
+            body_text = " ".join(p.get_text(strip=True) for p in paragraphs if len(p.get_text(strip=True)) > 30)
+
+        # Only upgrade if fetched content is meaningfully longer
+        if len(body_text) > len(existing_content) + 100:
+            return body_text[:3000]  # Cap at 3000 chars
+        return existing_content
+
+    except Exception:
+        return existing_content
 
 
 class TavilyFetcher:
@@ -198,3 +252,27 @@ class TavilyFetcher:
             seen_urls.add(article["url"])
             deduped.append(article)
         return deduped
+
+    def enrich_articles_with_body(self, articles: list[dict], max_workers: int = 10) -> list[dict]:
+        """
+        Concurrently fetch full article bodies for a list of articles.
+        Updates the 'content' field if fetched body is longer than RSS teaser.
+        """
+        def enrich_one(article):
+            enriched = article.copy()
+            enriched["content"] = fetch_article_body(
+                article["url"],
+                existing_content=article.get("content", "")
+            )
+            return enriched
+
+        enriched = []
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            futures = {executor.submit(enrich_one, article): article for article in articles}
+            for future in as_completed(futures):
+                try:
+                    enriched.append(future.result())
+                except Exception:
+                    enriched.append(futures[future])  # Keep original on error
+
+        return enriched

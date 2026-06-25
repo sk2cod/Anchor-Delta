@@ -19,6 +19,10 @@ def run_pipeline(extra_queries: list[str] = None, progress_callback=None):
     dynamic_articles = fetcher.fetch_dynamic_queries(active_cards)
 
     combined = rss_articles + fixed_articles + dynamic_articles
+
+    # Enrich articles with full body text
+    combined = fetcher.enrich_articles_with_body(combined)
+
     seen_urls = set()
     deduped = []
     for article in combined:
