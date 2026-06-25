@@ -8,6 +8,7 @@ from zoneinfo import ZoneInfo
 
 import streamlit as st
 
+from config import FRESHNESS_HOURS
 from db.cards import get_active_cards, get_archived_cards, get_card_by_id
 from db.delta_events import get_delta_events_for_card
 from db.noise_log import get_noise_log_since
@@ -292,6 +293,11 @@ with st.sidebar:
         st.session_state["last_run_results"] = run_results
         st.success("Pipeline complete.")
         st.rerun()
+
+    if FRESHNESS_HOURS > 48:
+        st.caption(f"⚠️ Bootstrap mode: fetching articles from last {FRESHNESS_HOURS // 24} days")
+    else:
+        st.caption(f"Daily mode: fetching articles from last {FRESHNESS_HOURS} hours")
 
     last_run_results = st.session_state.get("last_run_results")
     if last_run_results:

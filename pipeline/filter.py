@@ -6,6 +6,7 @@ from datetime import datetime, timedelta, timezone
 from email.utils import parsedate_to_datetime
 from zoneinfo import ZoneInfo
 
+from config import FRESHNESS_HOURS
 from db.noise_log import log_noise
 from db.processed_articles import is_url_seen, mark_article_processed
 from pipeline.simhash import (
@@ -184,12 +185,12 @@ def _gate_4_freshness_check(article):
             )
             return None
 
-        if now_sydney - parsed_sydney > timedelta(hours=48):
+        if now_sydney - parsed_sydney > timedelta(hours=FRESHNESS_HOURS):
             log_noise(
                 headline=article.get("title", ""),
                 source_url=article["url"],
                 gate_failed="gate_4",
-                reason="article older than 48 hours",
+                reason=f"article older than {FRESHNESS_HOURS} hours",
             )
             return None
 
