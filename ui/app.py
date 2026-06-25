@@ -247,6 +247,14 @@ def _format_run_timestamp(ts):
     return f"{date_str} at {time_str}"
 
 
+def format_elapsed(seconds):
+    if seconds < 60:
+        return f"{int(seconds)}s"
+    mins = int(seconds // 60)
+    secs = int(seconds % 60)
+    return f"{mins}m {secs}s"
+
+
 with st.sidebar:
     st.header("⚙️ Pipeline")
 
@@ -263,8 +271,24 @@ with st.sidebar:
     )
 
     if st.button("🚀 Run Pipeline"):
+        progress_placeholder = st.empty()
+
+        def _update_progress(results):
+            counts = {"created": 0, "updated": 0, "noise": 0, "capped": 0, "error": 0}
+            for result in results:
+                counts[result["status"]] = counts.get(result["status"], 0) + 1
+            progress_placeholder.info(
+                f"⚙️ Processing... Articles processed: {len(results)} | "
+                f"Created: {counts['created']} | Updated: {counts['updated']} | "
+                f"Noise: {counts['noise']}"
+            )
+
         with st.spinner("Fetching and filtering news sources..."):
-            run_results = run_pipeline(extra_queries=[user_query] if user_query else None)
+            run_results = run_pipeline(
+                extra_queries=[user_query] if user_query else None,
+                progress_callback=_update_progress,
+            )
+        progress_placeholder.empty()
         st.session_state["last_run_results"] = run_results
         st.success("Pipeline complete.")
         st.rerun()
@@ -280,7 +304,7 @@ with st.sidebar:
 
         run_stats = last_run_results.get("run_stats", {})
         col_time, col_haiku, col_sonnet, col_cost = st.columns(4)
-        col_time.metric("Run time", f"{run_stats.get('elapsed_seconds', 0)}s")
+        col_time.metric("Run time", format_elapsed(run_stats.get('elapsed_seconds', 0)))
         col_haiku.metric("Haiku calls", run_stats.get("haiku_calls", 0))
         col_sonnet.metric("Sonnet calls", run_stats.get("sonnet_calls", 0))
         col_cost.metric("Est. cost", f"${run_stats.get('estimated_cost_usd', 0):.2f}")

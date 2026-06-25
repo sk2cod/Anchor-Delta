@@ -8,7 +8,7 @@ from pipeline.orchestrator import process_article
 COST_GUARD_USD = 0.60
 
 
-def run_pipeline(extra_queries: list[str] = None):
+def run_pipeline(extra_queries: list[str] = None, progress_callback=None):
     reset_run_stats()
 
     fetcher = TavilyFetcher()
@@ -32,6 +32,9 @@ def run_pipeline(extra_queries: list[str] = None):
     results = []
     for article in survivors:
         results.append(process_article(article))
+
+        if progress_callback is not None:
+            progress_callback(results)
 
         if get_run_stats()["estimated_cost_usd"] >= COST_GUARD_USD:
             log_noise(
