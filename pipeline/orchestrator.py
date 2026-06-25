@@ -48,6 +48,7 @@ def process_article(article):
                 headline=result.event_headline,
                 what_happened=result.what_happened,
                 dialogue=[t.dict() for t in result.dialogue],
+                tldr=result.tldr,
             )
             update_last_delta_at(route_result.card_id)
 
@@ -87,6 +88,7 @@ def process_article(article):
                 headline=result.event_headline,
                 what_happened=result.what_happened,
                 dialogue=[t.dict() for t in result.dialogue],
+                tldr=result.tldr,
             )
             upsert_transmission(
                 card_id=new_card["id"],

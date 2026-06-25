@@ -27,6 +27,7 @@ create table if not exists delta_events (
   headline text not null,
   what_happened text not null,
   dialogue jsonb not null default '[]'::jsonb,
+  tldr text,
   created_at timestamptz not null default now()
 );
 

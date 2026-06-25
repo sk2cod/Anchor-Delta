@@ -142,6 +142,9 @@ def render_card(card_data):
     transmission = card_data["transmission"]
 
     with st.expander(_format_card_header(card)):
+        if delta_events and delta_events[0].get('tldr'):
+            st.caption(f"_{delta_events[0]['tldr']}_")
+
         st.caption("THE CORE ANCHOR")
         st.markdown(
             f'<div class="ad-card">{card["anchor_text"]}</div>',
@@ -151,6 +154,8 @@ def render_card(card_data):
         st.caption("⚡ LIVE STATUS TRACKER")
         for index, event in enumerate(delta_events):
             st.subheader(f"{event['event_date']} — {event['headline']}")
+            if event.get('tldr'):
+                st.markdown(f"*{event['tldr']}*")
             st.write(event["what_happened"])
             for turn in event.get("dialogue") or []:
                 st.markdown(f'> **{turn["speaker"]}:** *"{turn["quote"]}"*')

@@ -3,7 +3,7 @@ from datetime import date
 from db.client import supabase_client
 
 
-def append_delta_event(card_id, event_date, headline, what_happened, dialogue):
+def append_delta_event(card_id, event_date, headline, what_happened, dialogue, tldr=None):
     if isinstance(event_date, date):
         event_date = event_date.isoformat()
 
@@ -16,6 +16,7 @@ def append_delta_event(card_id, event_date, headline, what_happened, dialogue):
                 "headline": headline,
                 "what_happened": what_happened,
                 "dialogue": dialogue,
+                "tldr": tldr,
             }
         )
         .execute()

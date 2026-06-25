@@ -50,6 +50,7 @@ class NewCardResult(BaseModel):
     domain: str
     umbrella_title: str
     anchor_text: str
+    tldr: str          # add this — one sentence hook
     event_headline: str
     what_happened: str
     dialogue: list[DialogueTurn]
@@ -57,12 +58,13 @@ class NewCardResult(BaseModel):
     chain_latex: str
     nodes_markdown: str
 
-    @field_validator('domain', 'umbrella_title', 'anchor_text', 'event_headline', 'what_happened', 'chain_latex', 'nodes_markdown', mode='before')
+    @field_validator('domain', 'umbrella_title', 'anchor_text', 'tldr', 'event_headline', 'what_happened', 'chain_latex', 'nodes_markdown', mode='before')
     @classmethod
     def coerce_strings(cls, v):
         return _coerce_to_str(v)
 
 class DeltaUpdateResult(BaseModel):
+    tldr: str          # add this — one sentence hook
     event_headline: str
     what_happened: str
     dialogue: list[DialogueTurn]
@@ -71,7 +73,7 @@ class DeltaUpdateResult(BaseModel):
     chain_latex: Optional[str] = None
     nodes_markdown: Optional[str] = None
 
-    @field_validator('event_headline', 'what_happened', mode='before')
+    @field_validator('tldr', 'event_headline', 'what_happened', mode='before')
     @classmethod
     def coerce_strings(cls, v):
         return _coerce_to_str(v)
