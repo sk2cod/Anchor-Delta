@@ -174,6 +174,16 @@ def _gate_4_freshness_check(article):
             parsed = parsed.replace(tzinfo=timezone.utc)
         parsed_sydney = parsed.astimezone(SYDNEY_TZ)
 
+        # Reject articles from previous years immediately
+        if parsed_sydney.year < now_sydney.year:
+            log_noise(
+                headline=article.get("title", ""),
+                source_url=article["url"],
+                gate_failed="gate_4",
+                reason=f"article from previous year ({parsed_sydney.year}), rejected",
+            )
+            return None
+
         if now_sydney - parsed_sydney > timedelta(hours=48):
             log_noise(
                 headline=article.get("title", ""),

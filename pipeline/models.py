@@ -1,25 +1,50 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from typing import Optional
 from datetime import date
 
+def _coerce_to_str(v):
+    """Coerce list values to string for scalar string fields."""
+    if isinstance(v, list):
+        if len(v) == 1:
+            return str(v[0])
+        elif len(v) > 1:
+            return " | ".join(str(item) for item in v)
+        return ""
+    return v
+
 class RouteResult(BaseModel):
-    classification: str        # "noise" | "existing_card" | "new_frame"
-    card_id: Optional[str]     # populated only when classification == "existing_card"
-    confidence: str            # "high" | "medium" | "low"
-    reason: str                # one sentence explaining the routing decision
+    classification: str
+    card_id: Optional[str] = None
+    confidence: str
+    reason: str
+
+    @field_validator('classification', 'confidence', 'reason', mode='before')
+    @classmethod
+    def coerce_strings(cls, v):
+        return _coerce_to_str(v)
 
 class DialogueTurn(BaseModel):
     speaker: str
     quote: str
 
+    @field_validator('speaker', 'quote', mode='before')
+    @classmethod
+    def coerce_strings(cls, v):
+        return _coerce_to_str(v)
+
 class ExtractionResult(BaseModel):
     named_actors: list[str]
     dialogue: list[DialogueTurn]
     tactical_moves: list[str]
-    event_date: Optional[date]
+    event_date: Optional[date] = None
     named_consequences: list[str]
     event_headline: str
     what_happened: str
+
+    @field_validator('event_headline', 'what_happened', mode='before')
+    @classmethod
+    def coerce_strings(cls, v):
+        return _coerce_to_str(v)
 
 class NewCardResult(BaseModel):
     domain: str
@@ -32,11 +57,28 @@ class NewCardResult(BaseModel):
     chain_latex: str
     nodes_markdown: str
 
+    @field_validator('domain', 'umbrella_title', 'anchor_text', 'event_headline', 'what_happened', 'chain_latex', 'nodes_markdown', mode='before')
+    @classmethod
+    def coerce_strings(cls, v):
+        return _coerce_to_str(v)
+
 class DeltaUpdateResult(BaseModel):
     event_headline: str
     what_happened: str
     dialogue: list[DialogueTurn]
     event_date: date
     transmission_needs_update: bool
-    chain_latex: Optional[str]
-    nodes_markdown: Optional[str]
+    chain_latex: Optional[str] = None
+    nodes_markdown: Optional[str] = None
+
+    @field_validator('event_headline', 'what_happened', mode='before')
+    @classmethod
+    def coerce_strings(cls, v):
+        return _coerce_to_str(v)
+
+    @field_validator('chain_latex', 'nodes_markdown', mode='before')
+    @classmethod
+    def coerce_optional_strings(cls, v):
+        if v is None:
+            return v
+        return _coerce_to_str(v)
