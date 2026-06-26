@@ -116,7 +116,7 @@ If an article provides rich conceptual or structural analysis, it MUST pass even
 
 STEP 2 — DOMAIN CLASSIFICATION
 
-Classify based on story CONTENT not the source or query that fetched it. Apply this priority order when a story fits multiple domains: AUSTRALIA > INDIA > WORLD > FINANCE > AI_TECH.
+Classify based on story CONTENT not the source or query that fetched it. Apply this priority order when a story fits multiple domains: AUSTRALIA > INDIA > FINANCE > AI_TECH > WORLD.
 
 WORLD: International relations, wars, diplomacy, sanctions, military operations, major natural disasters with humanitarian or market consequence, surprise elections with geopolitical consequence, cross-domain global crises, anything globally significant that does not fit Finance, AI Tech, Australia, or India.
 
@@ -132,11 +132,32 @@ Examples that must pass as Finance signal:
 
 Reject: pure daily stock price movements, routine earnings with no macro consequence, consumer retail sales without systemic signal.
 
+Always pass as Finance signal:
+- Sovereign credit rating changes for any country
+- Major infrastructure financing deals with market consequence
+- Central bank stress test results with capital rule implications
+- Oil price movements tied to geopolitical events
+- Currency interventions by central banks
+
 AI_TECH: Sovereign compute infrastructure, semiconductor supply chains and manufacturing nodes, AI governance and regulation, hardware export restrictions, national security implications of AI, legislative constraints on technology, strategic AI infrastructure investments. Reject consumer app feature updates and routine product launches.
+
+Examples that must pass as AI_TECH signal:
+- Semiconductor architecture breakthroughs and chip manufacturing milestones
+- Moore's Law developments, chip density improvements with supply chain consequence
+- Hardware design innovations affecting compute infrastructure
+- AI model releases with geopolitical or regulatory consequence
+- Export controls on chips or AI technology
+- Data centre infrastructure investments at sovereign scale
 
 AUSTRALIA: Any story primarily about Australia — politics, economy, business, housing, security, ASIO and intelligence, resource sector, corporate governance, social policy, judicial decisions, cost-of-living policy, RBA decisions. Accept any significance level. This is a primary region for the reader.
 
 INDIA: Any story directly involving or impacting India — domestic growth, infrastructure, policy updates, banking and financial regulations, cross-border relations, political developments, judicial decisions, corporate actions, social policy. Route ANY India story here regardless of global consequence or scale. This is a primary region for the reader.
+
+Always pass as India signal regardless of global consequence:
+- Credit rating changes for major Indian conglomerates: Adani, Tata, Reliance, Infosys, Wipro, HDFC, ICICI
+- RBI policy decisions and banking regulatory changes
+- Major Indian infrastructure financing deals
+- India-specific trade agreement developments
 
 ---
 

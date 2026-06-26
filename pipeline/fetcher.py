@@ -19,10 +19,10 @@ RSS_FEEDS = [
     {"url": "https://www.theguardian.com/international/rss", "domain": "world"},
     {"url": "https://www.cnbc.com/id/100003114/device/rss/rss.html", "domain": "finance"},
     {"url": "https://www.ft.com/rss/home", "domain": "finance"},
-    {"url": "https://www.ft.com/rss/home/uk", "domain": "finance"},
     {"url": "https://feeds.bbci.co.uk/news/business/rss.xml", "domain": "finance"},
     {"url": "https://feeds.marketwatch.com/marketwatch/topstories", "domain": "finance"},
-    {"url": "https://rss.nytimes.com/services/xml/rss/nyt/Business.xml", "domain": "finance"},
+    {"url": "https://finance.yahoo.com/news/rssindex", "domain": "finance"},
+    {"url": "https://www.investing.com/rss/news.rss", "domain": "finance"},
     {"url": "https://www.technologyreview.com/feed/", "domain": "ai_tech"},
     {"url": "https://feeds.arstechnica.com/arstechnica/index", "domain": "ai_tech"},
     {"url": "https://feeds.arstechnica.com/arstechnica/technology-lab", "domain": "ai_tech"},
@@ -230,7 +230,6 @@ class TavilyFetcher:
             a for a in articles
             if not _is_social_media_url(a["url"])
             and not _is_index_page(a["url"])
-            and len(a.get("content", "")) >= 150
         ]
         return self._dedupe_by_url(articles)
 
