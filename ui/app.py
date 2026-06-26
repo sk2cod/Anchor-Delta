@@ -435,19 +435,20 @@ with st.sidebar:
             if domain not in ['world', 'finance', 'ai_tech', 'australia', 'india']:
                 domain = 'world'
 
-            card_id = create_card(
+            card_result = create_card(
                 domain=domain,
                 umbrella_title=umbrella_title or user_query,
                 anchor_text=anchor_text
             )
+            card_id = card_result['id'] if isinstance(card_result, dict) else card_result
 
             append_delta_event(
                 card_id=card_id,
-                event_headline=event_headline or f"Research: {user_query}",
+                event_date=date.today(),
+                headline=event_headline or f"Research: {user_query}",
                 what_happened=what_happened,
                 dialogue=[],
-                event_date=date.today(),
-                tldr=tldr
+                tldr=tldr,
             )
 
             from db.transmissions import upsert_transmission
