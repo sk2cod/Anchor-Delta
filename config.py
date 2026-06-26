@@ -25,8 +25,7 @@ if _missing:
     )
 
 VALID_DOMAINS = [
-    "geopolitics",
-    "top_stories",
+    "world",
     "finance",
     "ai_tech",
     "australia",

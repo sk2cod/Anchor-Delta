@@ -10,13 +10,13 @@ from tavily import TavilyClient
 from config import TAVILY_API_KEY
 
 RSS_FEEDS = [
-    {"url": "https://feeds.bbci.co.uk/news/world/rss.xml", "domain": "geopolitics"},
-    {"url": "https://www.aljazeera.com/xml/rss/all.xml", "domain": "geopolitics"},
-    {"url": "https://www.theguardian.com/world/rss", "domain": "geopolitics"},
-    {"url": "https://rss.dw.com/rss/en-all", "domain": "geopolitics"},
-    {"url": "https://www.france24.com/en/rss", "domain": "geopolitics"},
-    {"url": "https://feeds.bbci.co.uk/news/rss.xml", "domain": "top_stories"},
-    {"url": "https://www.theguardian.com/international/rss", "domain": "top_stories"},
+    {"url": "https://feeds.bbci.co.uk/news/world/rss.xml", "domain": "world"},
+    {"url": "https://www.aljazeera.com/xml/rss/all.xml", "domain": "world"},
+    {"url": "https://www.theguardian.com/world/rss", "domain": "world"},
+    {"url": "https://rss.dw.com/rss/en-all", "domain": "world"},
+    {"url": "https://www.france24.com/en/rss", "domain": "world"},
+    {"url": "https://feeds.bbci.co.uk/news/rss.xml", "domain": "world"},
+    {"url": "https://www.theguardian.com/international/rss", "domain": "world"},
     {"url": "https://www.cnbc.com/id/100003114/device/rss/rss.html", "domain": "finance"},
     {"url": "https://www.ft.com/rss/home", "domain": "finance"},
     {"url": "https://feeds.bbci.co.uk/news/business/rss.xml", "domain": "finance"},
@@ -171,7 +171,7 @@ class TavilyFetcher:
                     days=1,
                 )
                 for result in response.get("results", []):
-                    articles.append(self._to_article_dict(result, "top_stories"))
+                    articles.append(self._to_article_dict(result, "world"))
 
         articles = [
             a for a in articles

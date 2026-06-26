@@ -113,9 +113,9 @@ If an article provides rich conceptual or structural analysis, it MUST pass even
 
 STEP 2 — DOMAIN CLASSIFICATION
 
-Classify based on story CONTENT not the source or query that fetched it. Apply this priority order when a story fits multiple domains: AUSTRALIA > INDIA > GEOPOLITICS > FINANCE > AI_TECH > TOP_STORIES.
+Classify based on story CONTENT not the source or query that fetched it. Apply this priority order when a story fits multiple domains: AUSTRALIA > INDIA > WORLD > FINANCE > AI_TECH.
 
-GEOPOLITICS: Hard power dynamics, strategic friction, sanctions, military operations, diplomatic developments that alter the global status quo, resource nationalism, supply chain geopolitics, international trade disputes, critical mineral nationalism, secondary sanctions. Avoid routine diplomatic boilerplate or daily war updates that do not shift structural reality.
+WORLD: International relations, wars, diplomacy, sanctions, military operations, major natural disasters with humanitarian or market consequence, surprise elections with geopolitical consequence, cross-domain global crises, anything globally significant that does not fit Finance, AI Tech, Australia, or India.
 
 FINANCE: Systemic market pricing, capital allocation shifts, monetary policy logic, central bank framework decisions, sovereign credit risk, long-term bond yield cycles, currency crises, trade economics with market consequence, global liquidity trends, risk premium shifts.
 
@@ -134,14 +134,6 @@ AI_TECH: Sovereign compute infrastructure, semiconductor supply chains and manuf
 AUSTRALIA: Any story primarily about Australia — politics, economy, business, housing, security, ASIO and intelligence, resource sector, corporate governance, social policy, judicial decisions, cost-of-living policy, RBA decisions. Accept any significance level. This is a primary region for the reader.
 
 INDIA: Any story directly involving or impacting India — domestic growth, infrastructure, policy updates, banking and financial regulations, cross-border relations, political developments, judicial decisions, corporate actions, social policy. Route ANY India story here regardless of global consequence or scale. This is a primary region for the reader.
-
-TOP_STORIES: Use ONLY when no single domain above is clearly dominant AND the event is a genuine global systemic shock — a cross-domain crisis affecting multiple sectors simultaneously, a black swan event, or a development so structurally significant it reshapes multiple domains at once. Do not use TOP_STORIES as a catch-all for stories that fit elsewhere.
-
-Examples that must route to TOP_STORIES:
-- Major earthquakes (magnitude 6+) in any country with significant casualties or infrastructure damage
-- Major natural disasters affecting oil-producing nations (Venezuela, Iran, Iraq, Saudi Arabia, Nigeria) — these have direct market consequence
-- Cross-border humanitarian crises affecting global aid flows
-- Black swan events affecting multiple asset classes simultaneously
 
 ---
 
@@ -269,15 +261,14 @@ Read it back. Does it sound like a smart friend explaining something fascinating
 
 DOMAIN ASSIGNMENT RULE:
 Assign domain based on the STORY CONTENT, not the source or query that fetched it.
-- geopolitics: international relations, wars, diplomacy, sanctions, military, treaties, foreign policy
+- world: international relations, wars, diplomacy, sanctions, military, treaties, foreign policy, major natural disasters, cross-domain global crises
 - finance: markets, central banks, interest rates, inflation, corporate earnings with macro consequence, trade economics
 - ai_tech: artificial intelligence, semiconductors, cybersecurity, space technology, frontier tech policy
 - australia: any story primarily about Australia — politics, economy, business, security, society
 - india: any story primarily about India — politics, economy, business, security, society
-- top_stories: globally significant one-off events that do not fit a single domain
 
 Examples:
-- US tariffs story fetched by India query → finance or geopolitics, NOT india
+- US tariffs story fetched by India query → finance or world, NOT india
 - RBI interest rates → india
 - ASIO security alert → australia
 

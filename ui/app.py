@@ -293,8 +293,7 @@ def render_card(card_data):
 
 
 DOMAIN_KEYS = {
-    "🌍 Geopolitics": "geopolitics",
-    "📰 Top Stories": "top_stories",
+    "🌍 World": "world",
     "💹 Finance": "finance",
     "🤖 AI & Tech": "ai_tech",
     "🌏 Australia": "australia",
@@ -328,43 +327,30 @@ def render_domain_tab(domain_key):
                 st.divider()
 
 
+DOMAIN_PLACEHOLDER = "No active cards in this domain yet. Run the pipeline to fetch stories."
+
 (
-    tab_geopolitics,
-    tab_top_stories,
+    tab_world,
     tab_finance,
     tab_ai_tech,
     tab_australia,
     tab_india,
-) = st.tabs(
-    [
-        "🌍 Geopolitics",
-        "📰 Top Stories",
-        "💹 Finance",
-        "🤖 AI & Tech",
-        "🌏 Australia",
-        "🌐 India",
-    ]
-)
+) = st.tabs(["🌍 World", "💹 Finance", "🤖 AI & Tech", "🌏 Australia", "🌐 India"])
 
-DOMAIN_PLACEHOLDER = "No active cards in this domain yet. Run the pipeline to fetch stories."
-
-with tab_geopolitics:
-    render_domain_tab(DOMAIN_KEYS["🌍 Geopolitics"])
-
-with tab_top_stories:
-    render_domain_tab(DOMAIN_KEYS["📰 Top Stories"])
+with tab_world:
+    render_domain_tab("world")
 
 with tab_finance:
-    render_domain_tab(DOMAIN_KEYS["💹 Finance"])
+    render_domain_tab("finance")
 
 with tab_ai_tech:
-    render_domain_tab(DOMAIN_KEYS["🤖 AI & Tech"])
+    render_domain_tab("ai_tech")
 
 with tab_australia:
-    render_domain_tab(DOMAIN_KEYS["🌏 Australia"])
+    render_domain_tab("australia")
 
 with tab_india:
-    render_domain_tab(DOMAIN_KEYS["🌐 India"])
+    render_domain_tab("india")
 
 def _format_run_timestamp(ts):
     dt = datetime.fromisoformat(str(ts).replace("Z", "+00:00")).astimezone(

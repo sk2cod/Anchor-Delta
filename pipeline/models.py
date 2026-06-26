@@ -12,6 +12,24 @@ def _coerce_to_str(v):
         return ""
     return v
 
+def _dedupe_dialogue(turns):
+    """Keep only the first DialogueTurn per speaker. Discards subsequent quotes from same speaker."""
+    if not isinstance(turns, list):
+        return turns
+    seen_speakers = set()
+    deduped = []
+    for turn in turns:
+        if isinstance(turn, dict):
+            speaker = turn.get('speaker', '').strip().lower()
+        elif hasattr(turn, 'speaker'):
+            speaker = turn.speaker.strip().lower()
+        else:
+            continue
+        if speaker and speaker not in seen_speakers:
+            seen_speakers.add(speaker)
+            deduped.append(turn)
+    return deduped
+
 class RouteResult(BaseModel):
     classification: str
     card_id: Optional[str] = None
@@ -41,6 +59,11 @@ class ExtractionResult(BaseModel):
     event_headline: str
     what_happened: str
 
+    @field_validator('dialogue', mode='before')
+    @classmethod
+    def dedupe_speakers(cls, v):
+        return _dedupe_dialogue(v)
+
     @field_validator('event_headline', 'what_happened', mode='before')
     @classmethod
     def coerce_strings(cls, v):
@@ -58,6 +81,11 @@ class NewCardResult(BaseModel):
     chain_latex: str
     nodes_markdown: str
 
+    @field_validator('dialogue', mode='before')
+    @classmethod
+    def dedupe_speakers(cls, v):
+        return _dedupe_dialogue(v)
+
     @field_validator('domain', 'umbrella_title', 'anchor_text', 'tldr', 'event_headline', 'what_happened', 'chain_latex', 'nodes_markdown', mode='before')
     @classmethod
     def coerce_strings(cls, v):
@@ -72,6 +100,11 @@ class DeltaUpdateResult(BaseModel):
     transmission_needs_update: bool
     chain_latex: Optional[str] = None
     nodes_markdown: Optional[str] = None
+
+    @field_validator('dialogue', mode='before')
+    @classmethod
+    def dedupe_speakers(cls, v):
+        return _dedupe_dialogue(v)
 
     @field_validator('tldr', 'event_headline', 'what_happened', mode='before')
     @classmethod
