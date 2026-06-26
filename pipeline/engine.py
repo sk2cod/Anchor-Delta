@@ -493,28 +493,25 @@ def research_card(query: str) -> dict:
     client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
     prompt = f"""
-You are writing a personal intelligence briefing card for one specific reader.
-Research this topic using current web sources: "{query}"
+You are writing a personal intelligence briefing card. Research this topic using current web sources: "{query}"
 
-Write a full Anchor & Delta intelligence card with exactly this structure:
+Return ONLY a valid JSON object with exactly these fields — no markdown, no backticks, no explanation outside the JSON:
 
-UMBRELLA_TITLE: A sharp, specific title for this story (e.g. "Dharavi Rehabilitation: The FSI Monopoly Battle")
-
-DOMAIN: One of: world, finance, ai_tech, australia, india
-
-ANCHOR: 2-3 sentences. The structural reality driving this story — what is fundamentally true here that will still be true in six months. Direct, confident, no hedging.
-
-TLDR: One sentence hook. What would you say to a friend at dinner to make them lean in? Make the reader curious.
-
-EVENT_HEADLINE: Sharp dateline-style headline for the most recent development. Format: "June 2026: [What happened]"
-
-WHAT_HAPPENED: 2-3 sentences maximum. Key facts, key move, key consequence. Introduce every actor and concept before using them. Assume zero specialist knowledge.
-
-DIALOGUE: One sharp quote from a key named actor if available. Format: SPEAKER: "quote"
-
-CHAIN: The causal domino chain in plain text. Format: A → B → C → D
-
-NODES: 3-4 numbered insight nodes. Each node: bold title then 2-4 sentences of plain explanation assuming zero prior knowledge. Build picture from scratch. End with "The so what:" sentence.
+{{
+  "umbrella_title": "A sharp specific title for this story",
+  "domain": "one of: world, finance, ai_tech, australia, india",
+  "anchor": "2-3 sentences stating the structural reality driving this story. Direct, confident, no hedging.",
+  "tldr": "One sentence hook that makes the reader lean in and want to know more.",
+  "event_headline": "Sharp dateline headline for most recent development. Format: Month Year: What happened",
+  "what_happened": "2-3 sentences maximum. Key facts, key move, key consequence. Introduce every actor and concept. Assume zero specialist knowledge.",
+  "dialogue": "Speaker name: quote text — OR empty string if no good quote available",
+  "chain": "A → B → C → D causal chain in plain text",
+  "nodes": [
+    {{"title": "Node 1 title", "text": "2-4 sentences explaining this node assuming zero prior knowledge. End with: The so what: one sentence consequence."}},
+    {{"title": "Node 2 title", "text": "2-4 sentences..."}},
+    {{"title": "Node 3 title", "text": "2-4 sentences..."}}
+  ]
+}}
 
 VOICE RULES:
 - Direct, confident, slightly opinionated — like a sharp well-informed friend
@@ -523,8 +520,7 @@ VOICE RULES:
 - Short sentences with punch
 - Active voice always
 - One quote per speaker maximum
-
-Write the full card now based on current web research.
+- Use current web sources for the most recent facts and developments
 """
 
     response = client.models.generate_content(

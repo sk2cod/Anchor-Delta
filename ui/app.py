@@ -313,6 +313,27 @@ def render_card(card_data):
                 unsafe_allow_html=True,
             )
 
+        # Delete button
+        st.markdown(_THIN_DIVIDER, unsafe_allow_html=True)
+        col1, col2 = st.columns([6, 1])
+        with col2:
+            if st.button("🗑️", key=f"delete_{card['id']}", help="Delete this card"):
+                st.session_state[f"confirm_delete_{card['id']}"] = True
+
+        if st.session_state.get(f"confirm_delete_{card['id']}", False):
+            st.warning("Delete this card permanently?")
+            col_yes, col_no = st.columns([1, 1])
+            with col_yes:
+                if st.button("Yes, delete", key=f"confirm_yes_{card['id']}"):
+                    from db.cards import delete_card
+                    delete_card(card['id'])
+                    st.session_state[f"confirm_delete_{card['id']}"] = False
+                    st.rerun()
+            with col_no:
+                if st.button("Cancel", key=f"confirm_no_{card['id']}"):
+                    st.session_state[f"confirm_delete_{card['id']}"] = False
+                    st.rerun()
+
 
 DOMAIN_KEYS = {
     "🌍 World": "world",
@@ -401,53 +422,88 @@ with st.sidebar:
         last_logged_at = max(entry["logged_at"] for entry in all_noise)
         st.caption(f"Last run: {_format_run_timestamp(last_logged_at)}")
 
+    if 'research_running' not in st.session_state:
+        st.session_state.research_running = False
+
     col1, col2 = st.columns([3, 1])
     with col1:
         user_query = st.text_input("", placeholder="e.g. Dharavi rehabilitation FSI Mumbai", label_visibility="collapsed", key="query_input")
     with col2:
-        research_clicked = st.button("🔍", help="Research this topic with Gemini")
+        research_clicked = st.button("🔍", help="Research this topic with Gemini", disabled=st.session_state.research_running)
 
     if research_clicked and user_query:
+        st.session_state.research_running = True
         with st.spinner("Researching with Gemini..."):
             from pipeline.engine import research_card
-            from db.cards import create_card
+            from db.cards import create_card, get_active_cards
             from db.delta_events import append_delta_event
+            from difflib import SequenceMatcher
             import re as _re
             from datetime import date
 
+            def _similar_title(a, b):
+                return SequenceMatcher(None, a.lower(), b.lower()).ratio() > 0.6
+
             result = research_card(user_query)
-            raw = result["raw_text"]
+            import json as json_lib
 
-            def extract_field(text, field):
-                pattern = f"{field}:(.*?)(?=\\n[A-Z_]+:|$)"
-                match = _re.search(pattern, text, _re.DOTALL | _re.IGNORECASE)
-                return match.group(1).strip() if match else ""
+            try:
+                raw_clean = result["raw_text"].strip()
+                if raw_clean.startswith("```"):
+                    raw_clean = _re.sub(r"```json|```", "", raw_clean).strip()
+                parsed = json_lib.loads(raw_clean)
 
-            umbrella_title = extract_field(raw, "UMBRELLA_TITLE")
-            domain = extract_field(raw, "DOMAIN").lower().strip()
-            anchor_text = extract_field(raw, "ANCHOR")
-            tldr = extract_field(raw, "TLDR")
-            event_headline = extract_field(raw, "EVENT_HEADLINE")
-            what_happened = extract_field(raw, "WHAT_HAPPENED")
-            chain = extract_field(raw, "CHAIN")
-            nodes = extract_field(raw, "NODES")
+                umbrella_title = parsed.get("umbrella_title", user_query)
+                domain = parsed.get("domain", "world").lower().strip()
+                anchor_text = parsed.get("anchor", "")
+                tldr = parsed.get("tldr", "")
+                event_headline = parsed.get("event_headline", f"Research: {user_query}")
+                what_happened = parsed.get("what_happened", "")
+                chain = parsed.get("chain", "")
 
-            if domain not in ['world', 'finance', 'ai_tech', 'australia', 'india']:
-                domain = 'world'
+                nodes = parsed.get("nodes", [])
+                nodes_markdown = ""
+                for node in nodes:
+                    nodes_markdown += f"**{node.get('title', '')}**\n{node.get('text', '')}\n\n"
 
-            card_result = create_card(
-                domain=domain,
-                umbrella_title=umbrella_title or user_query,
-                anchor_text=anchor_text
-            )
-            card_id = card_result['id'] if isinstance(card_result, dict) else card_result
+                dialogue_raw = parsed.get("dialogue", "")
+                dialogue = []
+                if dialogue_raw and ":" in dialogue_raw:
+                    parts = dialogue_raw.split(":", 1)
+                    if len(parts) == 2:
+                        dialogue = [{"speaker": parts[0].strip(), "quote": parts[1].strip().strip('"')}]
+
+                if domain not in ['world', 'finance', 'ai_tech', 'australia', 'india']:
+                    domain = 'world'
+
+            except (json_lib.JSONDecodeError, KeyError) as e:
+                st.error(f"Failed to parse Gemini response: {e}")
+                st.session_state.research_running = False
+                st.stop()
+
+            existing_cards = get_active_cards(domain=domain)
+            existing_card = None
+            for card in existing_cards:
+                if _similar_title(card['umbrella_title'], umbrella_title or user_query):
+                    existing_card = card
+                    break
+
+            if existing_card:
+                card_id = existing_card['id']
+            else:
+                card_result = create_card(
+                    domain=domain,
+                    umbrella_title=umbrella_title or user_query,
+                    anchor_text=anchor_text
+                )
+                card_id = card_result['id'] if isinstance(card_result, dict) else card_result
 
             append_delta_event(
                 card_id=card_id,
                 event_date=date.today(),
                 headline=event_headline or f"Research: {user_query}",
                 what_happened=what_happened,
-                dialogue=[],
+                dialogue=dialogue,
                 tldr=tldr,
             )
 
@@ -455,10 +511,11 @@ with st.sidebar:
             upsert_transmission(
                 card_id=card_id,
                 chain_latex=chain,
-                nodes_markdown=nodes
+                nodes_markdown=nodes_markdown,
             )
 
             st.success(f"Research card created: {umbrella_title}")
+            st.session_state.research_running = False
             st.rerun()
 
     if st.button("🚀 Run Pipeline"):
