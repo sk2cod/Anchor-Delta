@@ -1,8 +1,11 @@
 import json
 import logging
+import os
 import time
 
 import anthropic
+from google import genai
+from google.genai import types
 from pydantic import ValidationError
 
 from config import ANTHROPIC_API_KEY
@@ -480,3 +483,57 @@ def compose_delta_update(article, extraction, existing_card, delta_history):
     RUN_STATS["sonnet_output_tokens"] += response.usage.output_tokens
 
     return result
+
+
+def research_card(query: str) -> dict:
+    """
+    Use Gemini 2.5 Flash with grounding to research a topic and produce
+    a full Anchor & Delta card in our standard format.
+    """
+    client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+
+    prompt = f"""
+You are writing a personal intelligence briefing card for one specific reader.
+Research this topic using current web sources: "{query}"
+
+Write a full Anchor & Delta intelligence card with exactly this structure:
+
+UMBRELLA_TITLE: A sharp, specific title for this story (e.g. "Dharavi Rehabilitation: The FSI Monopoly Battle")
+
+DOMAIN: One of: world, finance, ai_tech, australia, india
+
+ANCHOR: 2-3 sentences. The structural reality driving this story — what is fundamentally true here that will still be true in six months. Direct, confident, no hedging.
+
+TLDR: One sentence hook. What would you say to a friend at dinner to make them lean in? Make the reader curious.
+
+EVENT_HEADLINE: Sharp dateline-style headline for the most recent development. Format: "June 2026: [What happened]"
+
+WHAT_HAPPENED: 2-3 sentences maximum. Key facts, key move, key consequence. Introduce every actor and concept before using them. Assume zero specialist knowledge.
+
+DIALOGUE: One sharp quote from a key named actor if available. Format: SPEAKER: "quote"
+
+CHAIN: The causal domino chain in plain text. Format: A → B → C → D
+
+NODES: 3-4 numbered insight nodes. Each node: bold title then 2-4 sentences of plain explanation assuming zero prior knowledge. Build picture from scratch. End with "The so what:" sentence.
+
+VOICE RULES:
+- Direct, confident, slightly opinionated — like a sharp well-informed friend
+- Name the move — explain what it IS not just what happened
+- Assume zero specialist knowledge — explain every concept before using it
+- Short sentences with punch
+- Active voice always
+- One quote per speaker maximum
+
+Write the full card now based on current web research.
+"""
+
+    response = client.models.generate_content(
+        model="gemini-2.5-flash",
+        contents=prompt,
+        config=types.GenerateContentConfig(
+            tools=[types.Tool(google_search=types.GoogleSearch())],
+            temperature=0.7,
+        )
+    )
+
+    return {"raw_text": response.text, "query": query}

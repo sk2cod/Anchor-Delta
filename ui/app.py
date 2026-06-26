@@ -86,6 +86,31 @@ st.markdown(
         display: none !important;
     }
 
+    button[data-testid="baseButton-header"] {
+        background-color: rgba(255,255,255,0.1) !important;
+        border-radius: 4px !important;
+        opacity: 1 !important;
+        visibility: visible !important;
+    }
+
+    button[data-testid="baseButton-header"]:hover {
+        background-color: rgba(255,255,255,0.2) !important;
+    }
+
+    div[data-testid="collapsedControl"] {
+        display: flex !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        background-color: rgba(255,255,255,0.15) !important;
+        border-radius: 4px !important;
+    }
+
+    div[data-testid="collapsedControl"] button {
+        display: flex !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+    }
+
     </style>
     """,
     unsafe_allow_html=True,
@@ -376,10 +401,64 @@ with st.sidebar:
         last_logged_at = max(entry["logged_at"] for entry in all_noise)
         st.caption(f"Last run: {_format_run_timestamp(last_logged_at)}")
 
-    user_query = st.text_input(
-        "Add a specific story to this run (optional)",
-        placeholder="e.g. NEET exam paper leak India",
-    )
+    col1, col2 = st.columns([3, 1])
+    with col1:
+        user_query = st.text_input("", placeholder="e.g. Dharavi rehabilitation FSI Mumbai", label_visibility="collapsed", key="query_input")
+    with col2:
+        research_clicked = st.button("🔍", help="Research this topic with Gemini")
+
+    if research_clicked and user_query:
+        with st.spinner("Researching with Gemini..."):
+            from pipeline.engine import research_card
+            from db.cards import create_card
+            from db.delta_events import append_delta_event
+            import re as _re
+            from datetime import date
+
+            result = research_card(user_query)
+            raw = result["raw_text"]
+
+            def extract_field(text, field):
+                pattern = f"{field}:(.*?)(?=\\n[A-Z_]+:|$)"
+                match = _re.search(pattern, text, _re.DOTALL | _re.IGNORECASE)
+                return match.group(1).strip() if match else ""
+
+            umbrella_title = extract_field(raw, "UMBRELLA_TITLE")
+            domain = extract_field(raw, "DOMAIN").lower().strip()
+            anchor_text = extract_field(raw, "ANCHOR")
+            tldr = extract_field(raw, "TLDR")
+            event_headline = extract_field(raw, "EVENT_HEADLINE")
+            what_happened = extract_field(raw, "WHAT_HAPPENED")
+            chain = extract_field(raw, "CHAIN")
+            nodes = extract_field(raw, "NODES")
+
+            if domain not in ['world', 'finance', 'ai_tech', 'australia', 'india']:
+                domain = 'world'
+
+            card_id = create_card(
+                domain=domain,
+                umbrella_title=umbrella_title or user_query,
+                anchor_text=anchor_text
+            )
+
+            append_delta_event(
+                card_id=card_id,
+                event_headline=event_headline or f"Research: {user_query}",
+                what_happened=what_happened,
+                dialogue=[],
+                event_date=date.today(),
+                tldr=tldr
+            )
+
+            from db.transmissions import upsert_transmission
+            upsert_transmission(
+                card_id=card_id,
+                chain_latex=chain,
+                nodes_markdown=nodes
+            )
+
+            st.success(f"Research card created: {umbrella_title}")
+            st.rerun()
 
     if st.button("🚀 Run Pipeline"):
         progress_placeholder = st.empty()
