@@ -136,6 +136,91 @@ def _format_card_header(card):
         return f"📌 {card['umbrella_title']} — {timestamp}"
 
 
+_THIN_DIVIDER = "<hr style='margin:8px 0;border:none;border-top:0.5px solid rgba(255,255,255,0.1);'>"
+
+
+def _section_label(text: str) -> str:
+    return (
+        f"<p style='font-size:11px;text-transform:uppercase;color:#888;"
+        f"letter-spacing:0.08em;margin:16px 0 6px 0;'>{text}</p>"
+    )
+
+
+def _render_event_block(event: dict):
+    headline = event.get("headline") or event.get("event_headline", "")
+    event_date = event.get("event_date", "")
+    st.markdown(
+        f"<p style='font-size:15px;font-weight:500;margin:4px 0 2px 0;'>{headline}</p>",
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        f"<p style='font-size:12px;color:#888;margin:0 0 6px 0;'>{event_date}</p>",
+        unsafe_allow_html=True,
+    )
+    if event.get("tldr"):
+        st.markdown(
+            f"<p style='font-size:14px;font-style:italic;color:#888;margin:0 0 8px 0;'>{event['tldr']}</p>",
+            unsafe_allow_html=True,
+        )
+    st.markdown(
+        f"<p style='font-size:14px;line-height:1.7;margin:0 0 8px 0;'>{event.get('what_happened', '')}</p>",
+        unsafe_allow_html=True,
+    )
+    for turn in event.get("dialogue") or []:
+        st.markdown(
+            f"<div style='border-left:2px solid rgba(255,255,255,0.2);padding-left:12px;margin:6px 0;'>"
+            f"<span style='font-size:12px;color:#888;'>{turn['speaker']}</span><br>"
+            f"<span style='font-size:14px;font-style:italic;'>\"{turn['quote']}\"</span>"
+            f"</div>",
+            unsafe_allow_html=True,
+        )
+
+
+def _render_nodes_markdown(nodes_md: str):
+    blocks = re.split(r'\n\n+', nodes_md.strip())
+    for block in blocks:
+        block = block.strip()
+        if not block:
+            continue
+        lines = block.split('\n')
+        first_line = lines[0].strip()
+
+        title_only = re.match(r'^\*\*(.+?)\*\*\s*$', first_line)
+        title_inline = re.match(r'^\*\*(.+?)\*\*[:\s]+(.+)$', first_line, re.DOTALL)
+        heading = re.match(r'^#{1,4}\s+(.+)$', first_line)
+
+        if title_only:
+            title = title_only.group(1).strip()
+            st.markdown(
+                f"<p style='font-size:14px;font-weight:500;margin:12px 0 4px 0;'>{title}</p>",
+                unsafe_allow_html=True,
+            )
+            body = '\n'.join(lines[1:]).strip()
+            if body:
+                st.markdown(body)
+        elif title_inline:
+            title = title_inline.group(1).strip()
+            rest = title_inline.group(2).strip()
+            st.markdown(
+                f"<p style='font-size:14px;font-weight:500;margin:12px 0 4px 0;'>{title}</p>",
+                unsafe_allow_html=True,
+            )
+            body = '\n'.join([rest] + lines[1:]).strip()
+            if body:
+                st.markdown(body)
+        elif heading:
+            title = heading.group(1).strip()
+            st.markdown(
+                f"<p style='font-size:14px;font-weight:500;margin:12px 0 4px 0;'>{title}</p>",
+                unsafe_allow_html=True,
+            )
+            body = '\n'.join(lines[1:]).strip()
+            if body:
+                st.markdown(body)
+        else:
+            st.markdown(block)
+
+
 def render_card(card_data):
     card = card_data["card"]
     delta_events = card_data["delta_events"]
@@ -145,44 +230,66 @@ def render_card(card_data):
     older = delta_events[1:] if delta_events else []
 
     with st.expander(_format_card_header(card)):
-        if latest and latest.get('tldr'):
-            st.caption(f"_{latest['tldr']}_")
+        # 1. tldr hook — Level 1: 17px, weight 500, red left border
+        if latest and latest.get("tldr"):
+            st.markdown(
+                f"<p style='font-size:17px;font-weight:500;border-left:4px solid #E24B4A;"
+                f"padding-left:12px;margin:0 0 16px 0;'>{latest['tldr']}</p>",
+                unsafe_allow_html=True,
+            )
 
-        st.caption("⚡ LATEST")
+        # 2. ⚡ LATEST section label — Level 3
+        st.markdown(_section_label("⚡ LATEST"), unsafe_allow_html=True)
+
+        # 3–7. Latest event block
         if latest:
-            st.subheader(f"{latest['event_date']} — {latest['headline']}")
-            if latest.get('tldr'):
-                st.markdown(f"*{latest['tldr']}*")
-            st.write(latest["what_happened"])
-            for turn in latest.get("dialogue") or []:
-                st.markdown(f'> **{turn["speaker"]}:** *"{turn["quote"]}"*')
+            _render_event_block(latest)
 
-        st.caption("THE CORE ANCHOR")
+        # 8. Thin divider
+        st.markdown(_THIN_DIVIDER, unsafe_allow_html=True)
+
+        # 9. THE CORE ANCHOR section label — Level 3
+        st.markdown(_section_label("THE CORE ANCHOR"), unsafe_allow_html=True)
+
+        # 10. Anchor text in muted background box
         st.markdown(
-            f'<div class="ad-card">{card["anchor_text"]}</div>',
+            f"<div style='background:rgba(255,255,255,0.05);border-radius:8px;padding:12px 14px;"
+            f"font-size:14px;line-height:1.7;'>{card['anchor_text']}</div>",
             unsafe_allow_html=True,
         )
 
-        st.divider()
+        # 11. Thin divider
+        st.markdown(_THIN_DIVIDER, unsafe_allow_html=True)
 
+        # 12. Previous Chapters expander
         if older:
             with st.expander("📖 Previous Chapters", expanded=False):
                 for index, event in enumerate(older):
-                    st.subheader(f"{event['event_date']} — {event['headline']}")
-                    if event.get('tldr'):
-                        st.markdown(f"*{event['tldr']}*")
-                    st.write(event["what_happened"])
-                    for turn in event.get("dialogue") or []:
-                        st.markdown(f'> **{turn["speaker"]}:** *"{turn["quote"]}"*')
+                    _render_event_block(event)
                     if index < len(older) - 1:
-                        st.divider()
+                        st.markdown(_THIN_DIVIDER, unsafe_allow_html=True)
 
-        st.caption("🧩 THE CONCEPTUAL TRANSMISSION")
+        # 13. Thin divider
+        st.markdown(_THIN_DIVIDER, unsafe_allow_html=True)
+
+        # 14. 🧩 CONCEPTUAL TRANSMISSION section label — Level 3
+        st.markdown(_section_label("🧩 CONCEPTUAL TRANSMISSION"), unsafe_allow_html=True)
+
         if transmission:
-            st.markdown(_chain_latex_to_text(transmission["chain_latex"]))
-            st.markdown(transmission["nodes_markdown"])
+            # 15. Transmission chain in monospace box
+            chain_text = _chain_latex_to_text(transmission["chain_latex"])
+            st.markdown(
+                f"<div style='background:rgba(255,255,255,0.05);border-radius:8px;padding:10px 14px;"
+                f"font-family:monospace;font-size:14px;'>{chain_text}</div>",
+                unsafe_allow_html=True,
+            )
+            # 16. Node titles (14px, weight 500) + explanations (14px body)
+            _render_nodes_markdown(transmission["nodes_markdown"])
         else:
-            st.caption("Transmission not yet generated.")
+            st.markdown(
+                "<p style='font-size:11px;color:#888;'>Transmission not yet generated.</p>",
+                unsafe_allow_html=True,
+            )
 
 
 DOMAIN_KEYS = {
