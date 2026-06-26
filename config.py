@@ -32,7 +32,7 @@ VALID_DOMAINS = [
     "india",
 ]
 
-MAX_ACTIVE_CARDS = 10
+MAX_ACTIVE_CARDS = 15
 ARCHIVE_AFTER_DAYS = 14
 SYDNEY_TZ = "Australia/Sydney"
 

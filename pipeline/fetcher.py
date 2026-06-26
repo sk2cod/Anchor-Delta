@@ -19,7 +19,6 @@ RSS_FEEDS = [
     {"url": "https://www.theguardian.com/international/rss", "domain": "world"},
     {"url": "https://www.cnbc.com/id/100003114/device/rss/rss.html", "domain": "finance"},
     {"url": "https://www.ft.com/rss/home", "domain": "finance"},
-    {"url": "https://feeds.bbci.co.uk/news/business/rss.xml", "domain": "finance"},
     {"url": "https://feeds.marketwatch.com/marketwatch/topstories", "domain": "finance"},
     {"url": "https://finance.yahoo.com/news/rssindex", "domain": "finance"},
     {"url": "https://www.investing.com/rss/news.rss", "domain": "finance"},
