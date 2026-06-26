@@ -86,8 +86,6 @@ st.markdown(
         display: none !important;
     }
 
-    [data-testid="stSidebarCollapsedControl"] { display: none !important; }
-    [data-testid="collapsedControl"] { display: none !important; }
     </style>
     """,
     unsafe_allow_html=True,
@@ -148,20 +146,19 @@ def _section_label(text: str) -> str:
 
 def _render_event_block(event: dict):
     headline = event.get("headline") or event.get("event_headline", "")
-    event_date = event.get("event_date", "")
+    date_str = event.get("event_date", "")
+    try:
+        formatted_date = datetime.strptime(str(date_str), "%Y-%m-%d").strftime("%B %d, %Y").replace(" 0", " ")
+    except Exception:
+        formatted_date = str(date_str)
     st.markdown(
         f"<p style='font-size:15px;font-weight:500;margin:4px 0 2px 0;'>{headline}</p>",
         unsafe_allow_html=True,
     )
     st.markdown(
-        f"<p style='font-size:12px;color:#888;margin:0 0 6px 0;'>{event_date}</p>",
+        f"<p style='font-size:12px;color:#888;margin:0 0 6px 0;'>{formatted_date}</p>",
         unsafe_allow_html=True,
     )
-    if event.get("tldr"):
-        st.markdown(
-            f"<p style='font-size:14px;font-style:italic;color:#888;margin:0 0 8px 0;'>{event['tldr']}</p>",
-            unsafe_allow_html=True,
-        )
     st.markdown(
         f"<p style='font-size:14px;line-height:1.7;margin:0 0 8px 0;'>{event.get('what_happened', '')}</p>",
         unsafe_allow_html=True,
@@ -192,7 +189,7 @@ def _render_nodes_markdown(nodes_md: str):
         if title_only:
             title = title_only.group(1).strip()
             st.markdown(
-                f"<p style='font-size:14px;font-weight:500;margin:12px 0 4px 0;'>{title}</p>",
+                f"<p style='font-size:16px;font-weight:500;color:var(--color-text-primary);margin-top:1.5rem;margin-bottom:4px;display:block;border-top:0.5px solid rgba(255,255,255,0.1);padding-top:1rem;'>{title}</p>",
                 unsafe_allow_html=True,
             )
             body = '\n'.join(lines[1:]).strip()
@@ -202,7 +199,7 @@ def _render_nodes_markdown(nodes_md: str):
             title = title_inline.group(1).strip()
             rest = title_inline.group(2).strip()
             st.markdown(
-                f"<p style='font-size:14px;font-weight:500;margin:12px 0 4px 0;'>{title}</p>",
+                f"<p style='font-size:16px;font-weight:500;color:var(--color-text-primary);margin-top:1.5rem;margin-bottom:4px;display:block;border-top:0.5px solid rgba(255,255,255,0.1);padding-top:1rem;'>{title}</p>",
                 unsafe_allow_html=True,
             )
             body = '\n'.join([rest] + lines[1:]).strip()
@@ -211,7 +208,7 @@ def _render_nodes_markdown(nodes_md: str):
         elif heading:
             title = heading.group(1).strip()
             st.markdown(
-                f"<p style='font-size:14px;font-weight:500;margin:12px 0 4px 0;'>{title}</p>",
+                f"<p style='font-size:16px;font-weight:500;color:var(--color-text-primary);margin-top:1.5rem;margin-bottom:4px;display:block;border-top:0.5px solid rgba(255,255,255,0.1);padding-top:1rem;'>{title}</p>",
                 unsafe_allow_html=True,
             )
             body = '\n'.join(lines[1:]).strip()
