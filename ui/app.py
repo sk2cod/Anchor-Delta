@@ -427,7 +427,7 @@ with st.sidebar:
 
     col1, col2 = st.columns([3, 1])
     with col1:
-        user_query = st.text_input("", placeholder="e.g. Dharavi rehabilitation FSI Mumbai", label_visibility="collapsed", key="query_input")
+        user_query = st.text_input("", placeholder="", label_visibility="collapsed", key="query_input")
     with col2:
         research_clicked = st.button("🔍", help="Research this topic with Gemini", disabled=st.session_state.research_running)
 
