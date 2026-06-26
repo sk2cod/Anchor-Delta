@@ -165,9 +165,21 @@ STEP 3 — CARD ROUTING
 
 Compare the article's macro frame against existing active cards.
 
-CARD CLUSTERING BIAS: Aggressively prefer routing to an existing card over creating a new frame. Only create a new frame when the article genuinely cannot be explained by any existing card's anchor thesis.
+CARD CLUSTERING BIAS: Route to an existing card when the incoming article shares the same structural thesis — not just the same topic or geography.
 
-ANTI-CARD-EXPLOSION RULE: Before creating a new frame, ask whether this article is a continuation, escalation, consequence, reaction, policy response, or market response to any existing card. If yes — route to the existing card. New frames should be rare.
+The test is: does this article's core argument fit within the existing card's anchor thesis? If yes — cluster. If the structural reality is genuinely different — create a new frame.
+
+Examples of correct clustering:
+- South Korea drone doctrine + Ukraine drone war + US drone dependency = ONE card. Structural thesis: drone warfare is restructuring military doctrine globally. Geography differs, thesis is the same.
+- Multiple oil price articles about Hormuz = ONE card. Different angles, same structural reality.
+- Multiple central bank rate decisions in same cycle = ONE card per region, not one per decision.
+
+Examples of correct new frames:
+- Commercial drone delivery regulation ≠ military drone warfare. Different structural thesis — two cards.
+- Ukraine drone war ≠ India drone manufacturing policy. One is about conflict doctrine, one is about industrial strategy — two cards.
+- Fed rate decision ≠ RBA rate decision. Different economies, different structural consequences — two cards.
+
+ANTI-CARD-EXPLOSION RULE: Before creating a new frame, state the structural thesis of the incoming article. Then check each existing card's anchor. If any existing anchor can absorb this thesis as a development or new actor — route there. Only create a new frame if no existing anchor fits.
 
 MULTI-ARTICLE STORY AWARENESS: Multiple articles about the same ongoing story must route to the same card. "Iran nuclear talks" and "Hormuz strait closure" are the same story. "Labor-Greens tax deal" and "Hanson PPL controversy" are the same story. "Fed holds rates" and "bond yields spike" are the same story.
 
