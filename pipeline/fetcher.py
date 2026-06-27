@@ -205,9 +205,10 @@ class TavilyFetcher:
         ]
         return self._dedupe_by_url(articles)
 
-    def fetch_rss_articles(self) -> list[dict]:
+    def fetch_rss_articles(self, domain=None) -> list[dict]:
         articles = []
-        for feed_entry in RSS_FEEDS:
+        feeds = [f for f in RSS_FEEDS if domain is None or f["domain"] == domain]
+        for feed_entry in feeds:
             parsed_feed = feedparser.parse(feed_entry["url"])
             source_domain = urlparse(feed_entry["url"]).netloc
 

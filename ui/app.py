@@ -493,7 +493,25 @@ with st.sidebar:
             st.session_state.research_running = False
             st.rerun()
 
-    if st.button("🚀 Run Pipeline"):
+    st.markdown("**Run Pipeline**")
+    _domain_buttons = [
+        ("🌍 World", "world"),
+        ("💹 Finance", "finance"),
+        ("🤖 AI & Tech", "ai_tech"),
+        ("🌏 Australia", "australia"),
+        ("🌐 India", "india"),
+        ("🚀 All Domains", None),
+    ]
+    _run_domain = None
+    _run_triggered = False
+    col1, col2 = st.columns(2)
+    for i, (label, dom) in enumerate(_domain_buttons):
+        with col1 if i % 2 == 0 else col2:
+            if st.button(label, use_container_width=True):
+                _run_domain = dom
+                _run_triggered = True
+
+    if _run_triggered:
         progress_placeholder = st.empty()
 
         def _update_progress(results):
@@ -501,7 +519,7 @@ with st.sidebar:
             for result in results:
                 counts[result["status"]] = counts.get(result["status"], 0) + 1
             progress_placeholder.info(
-                f"⚙️ Processing... Articles processed: {len(results)} | "
+                f"Processing... Articles processed: {len(results)} | "
                 f"Created: {counts['created']} | Updated: {counts['updated']} | "
                 f"Noise: {counts['noise']}"
             )
@@ -510,6 +528,7 @@ with st.sidebar:
             run_results = run_pipeline(
                 extra_queries=[user_query] if user_query else None,
                 progress_callback=_update_progress,
+                domain=_run_domain,
             )
         progress_placeholder.empty()
         st.session_state["last_run_results"] = run_results

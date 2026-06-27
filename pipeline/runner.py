@@ -12,12 +12,12 @@ logger = logging.getLogger(__name__)
 COST_GUARD_USD = 1.00
 
 
-def run_pipeline(extra_queries: list[str] = None, progress_callback=None):
+def run_pipeline(extra_queries: list[str] = None, progress_callback=None, domain=None):
     reset_run_stats()
 
     fetcher = TavilyFetcher()
 
-    rss_articles = fetcher.fetch_rss_articles()
+    rss_articles = fetcher.fetch_rss_articles(domain=domain)
     fixed_articles = fetcher.fetch_user_queries(extra_queries=extra_queries)
     active_cards = get_active_cards()
     try:
@@ -25,6 +25,10 @@ def run_pipeline(extra_queries: list[str] = None, progress_callback=None):
     except Exception as e:
         logger.warning(f"Tavily dynamic queries failed: {e}")
         dynamic_articles = []
+
+    if domain is not None:
+        fixed_articles = [a for a in fixed_articles if a.get("query_domain") == domain]
+        dynamic_articles = [a for a in dynamic_articles if a.get("query_domain") == domain]
 
     combined = rss_articles + fixed_articles + dynamic_articles
 
