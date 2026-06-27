@@ -529,32 +529,38 @@ def research_card(query: str) -> dict:
     prompt = f"""
 You are writing a personal intelligence briefing card. Research this topic using current web sources: "{query}"
 
-Return ONLY a valid JSON object with exactly these fields — no markdown, no backticks, no explanation outside the JSON:
+Return ONLY a valid JSON object — no markdown, no backticks, no explanation outside the JSON.
+
+THE GOLDEN RULE — ASSUME ZERO SPECIALIST KNOWLEDGE:
+Before you use any concept, introduce it. Build the picture from the ground up. If you mention a company, explain what it does first. If you mention a policy, explain what it is before explaining what changed. Never write a sentence that requires the reader to already know something you have not explained yet. The goal is to make the reader feel like they understand something they never understood before — and feel smarter for reading it.
+
+VOICE RULES:
+- Direct, confident, slightly opinionated — like a sharp well-informed friend explaining something fascinating over dinner
+- Name the move — explain what it IS not just what happened. Examples: "This is a classic wedge play." "This is coercion dressed as diplomacy." "This is a survival move, not an ideology."
+- Short sentences with punch, then explain fully. Hook first, depth second.
+- YOU explain — not the analysts. Quotes are supporting evidence only. Make your point first, then bring in the quote that confirms it.
+- One quote per speaker maximum — the sharpest line only
+- Active voice always — never "the decision was made", always "Trump decided"
+- No jargon without explanation — every technical term explained immediately in plain language
+- Anchor is a verdict — state the structural reality with confidence. No hedging. No "it remains to be seen." State it.
+- Use current web sources for the most recent facts and developments
 
 {{
   "umbrella_title": "A sharp specific title for this story",
   "domain": "one of: world, finance, ai_tech, australia, india",
-  "anchor": "2-3 sentences stating the structural reality driving this story. Direct, confident, no hedging.",
-  "tldr": "One sentence hook that makes the reader lean in and want to know more.",
+  "anchor": "2-3 sentences. State the structural reality driving this story with authority. What is fundamentally true here that will still be true in six months? No hedging. State your verdict.",
+  "tldr": "One sentence hook. What would you say to a friend at dinner to make them lean in and say 'wait, tell me more'? Not a summary — a spark.",
   "event_headline": "Sharp dateline headline for most recent development. Format: Month Year: What happened",
-  "what_happened": "2-3 sentences maximum. Key facts, key move, key consequence. Introduce every actor and concept. Assume zero specialist knowledge.",
+  "what_happened": "2-3 sentences maximum. Key facts, key move, key consequence. Introduce every actor and concept before using them. Assume zero specialist knowledge.",
   "dialogue": "Speaker name: quote text — OR empty string if no good quote available",
-  "chain": "A → B → C → D causal chain in plain text",
+  "chain": "A → B → C → D causal chain in plain text showing cause and effect",
   "nodes": [
-    {{"title": "Node 1 title", "text": "2-4 sentences explaining this node assuming zero prior knowledge. End with: The so what: one sentence consequence."}},
-    {{"title": "Node 2 title", "text": "2-4 sentences..."}},
-    {{"title": "Node 3 title", "text": "2-4 sentences..."}}
+    {{"title": "Node 1 title — make it an insight not a label", "text": "2-4 sentences. Do not just look at the loudest headline — explicitly extract the underlying structural move, secondary policy shift, or economic dependency driving this story. Assume zero prior knowledge — explain every concept before building on it. End with: The so what: one sentence on why this matters right now."}},
+    {{"title": "Node 2 title", "text": "2-4 sentences. Look for the counter-move, the overlooked technical detail, or the downstream domestic impact — especially if relevant to Australia or India. Explain every concept from scratch. End with: The so what: one sentence consequence."}},
+    {{"title": "Node 3 title", "text": "2-4 sentences. Identify the broader systemic impact — the long-term industry ripple, the secondary track (regulation, infrastructure, digital policy) that supports the main narrative. Explain every concept from scratch. End with: The so what: one sentence consequence."}},
+    {{"title": "Node 4 title", "text": "2-4 sentences. What does this mean specifically for Australia or India — or for a business professional operating across both markets? If no direct link exists, identify the global investor or policy consequence. End with: The so what: one sentence consequence."}}
   ]
 }}
-
-VOICE RULES:
-- Direct, confident, slightly opinionated — like a sharp well-informed friend
-- Name the move — explain what it IS not just what happened
-- Assume zero specialist knowledge — explain every concept before using it
-- Short sentences with punch
-- Active voice always
-- One quote per speaker maximum
-- Use current web sources for the most recent facts and developments
 """
 
     response = client.models.generate_content(
