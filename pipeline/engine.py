@@ -285,8 +285,12 @@ Write the LaTeX causal chain. Then write 3-5 domino nodes.
 Each node must:
 - Open with a bold title that IS the insight — not a label. "The Dark Tanker Problem" not "Background."
 - Assume zero prior knowledge — explain every concept before building on it
-- Build the picture from scratch — who, what, why, how — before delivering the structural insight
-- End with the "so what" — why does this matter for the reader right now
+- Each node has a specific analytical job:
+  Node 1: Extract the underlying structural move — not the loudest headline but the hidden policy shift, economic dependency, or power realignment driving the story
+  Node 2: Find the counter-move, overlooked technical detail, or downstream domestic impact
+  Node 3: Identify the broader systemic ripple — long-term industry, regulatory, or infrastructure consequence
+  Node 4: What does this mean for Australia or India specifically — or for a business professional operating across both markets?
+- End with "The so what:" — one sentence on why this matters right now
 
 The chain should feel like a revelation. By the end, the reader should think: "I never understood why this worked this way — now I do."
 
@@ -354,6 +358,9 @@ Every technical term explained immediately in plain language.
 
 9. WHAT HAPPENED — 2-3 SENTENCES MAXIMUM
 Key facts. Key move. Key consequence. Done.
+
+10. TLDR — THE CHAPTER HOOK
+One sentence that captures why TODAY's development matters in the context of the full story. Not a summary of what happened — a hook that makes the reader want to read this chapter. It should feel like: here is why today changes everything we thought we knew about this story.
 
 ---
 
