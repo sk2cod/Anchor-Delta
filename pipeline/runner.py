@@ -1,9 +1,13 @@
+import logging
+
 from db.cards import get_active_cards
 from db.noise_log import log_noise
 from pipeline.engine import get_run_stats, reset_run_stats
 from pipeline.fetcher import TavilyFetcher
 from pipeline.filter import run_filter_pipeline
 from pipeline.orchestrator import process_article
+
+logger = logging.getLogger(__name__)
 
 COST_GUARD_USD = 1.00
 
@@ -16,7 +20,11 @@ def run_pipeline(extra_queries: list[str] = None, progress_callback=None):
     rss_articles = fetcher.fetch_rss_articles()
     fixed_articles = fetcher.fetch_user_queries(extra_queries=extra_queries)
     active_cards = get_active_cards()
-    dynamic_articles = fetcher.fetch_dynamic_queries(active_cards)
+    try:
+        dynamic_articles = fetcher.fetch_dynamic_queries(active_cards)
+    except Exception as e:
+        logger.warning(f"Tavily dynamic queries failed: {e}")
+        dynamic_articles = []
 
     combined = rss_articles + fixed_articles + dynamic_articles
 
