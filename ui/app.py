@@ -19,7 +19,7 @@ st.set_page_config(
     page_title="Anchor & Delta",
     page_icon="⚓",
     layout="wide",
-    initial_sidebar_state="expanded",
+    initial_sidebar_state="auto",
 )
 
 st.markdown(
@@ -84,31 +84,6 @@ st.markdown(
     [data-baseweb="tab-list"] button[aria-label="scroll left"],
     [data-baseweb="tab-list"] button[aria-label="scroll right"] {
         display: none !important;
-    }
-
-    button[data-testid="baseButton-header"] {
-        background-color: rgba(255,255,255,0.1) !important;
-        border-radius: 4px !important;
-        opacity: 1 !important;
-        visibility: visible !important;
-    }
-
-    button[data-testid="baseButton-header"]:hover {
-        background-color: rgba(255,255,255,0.2) !important;
-    }
-
-    div[data-testid="collapsedControl"] {
-        display: flex !important;
-        visibility: visible !important;
-        opacity: 1 !important;
-        background-color: rgba(255,255,255,0.15) !important;
-        border-radius: 4px !important;
-    }
-
-    div[data-testid="collapsedControl"] button {
-        display: flex !important;
-        visibility: visible !important;
-        opacity: 1 !important;
     }
 
     </style>

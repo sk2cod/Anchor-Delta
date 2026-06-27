@@ -166,9 +166,15 @@ def _gate_3_keyword_filter(article):
     return True
 
 
+_AI_TECH_FRESHNESS_HOURS = 96
+
+
 def _gate_4_freshness_check(article):
     now_sydney = datetime.now(SYDNEY_TZ)
     parsed = _parse_published_date(article.get("published_date"))
+
+    domain = article.get("query_domain", "")
+    freshness_hours = _AI_TECH_FRESHNESS_HOURS if domain == "ai_tech" else FRESHNESS_HOURS
 
     if parsed is not None:
         if parsed.tzinfo is None:
@@ -185,12 +191,12 @@ def _gate_4_freshness_check(article):
             )
             return None
 
-        if now_sydney - parsed_sydney > timedelta(hours=FRESHNESS_HOURS):
+        if now_sydney - parsed_sydney > timedelta(hours=freshness_hours):
             log_noise(
                 headline=article.get("title", ""),
                 source_url=article["url"],
                 gate_failed="gate_4",
-                reason=f"article older than {FRESHNESS_HOURS} hours",
+                reason=f"article older than {freshness_hours} hours",
             )
             return None
 

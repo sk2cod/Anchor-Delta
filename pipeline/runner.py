@@ -5,7 +5,7 @@ from pipeline.fetcher import TavilyFetcher
 from pipeline.filter import run_filter_pipeline
 from pipeline.orchestrator import process_article
 
-COST_GUARD_USD = 0.60
+COST_GUARD_USD = 1.00
 
 
 def run_pipeline(extra_queries: list[str] = None, progress_callback=None):
