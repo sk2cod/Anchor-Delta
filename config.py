@@ -1,13 +1,27 @@
 import os
 
-from dotenv import load_dotenv
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
 
-load_dotenv()
+try:
+    import streamlit as st
+    if hasattr(st, 'secrets'):
+        os.environ.setdefault('ANTHROPIC_API_KEY', st.secrets.get('ANTHROPIC_API_KEY', ''))
+        os.environ.setdefault('TAVILY_API_KEY', st.secrets.get('TAVILY_API_KEY', ''))
+        os.environ.setdefault('SUPABASE_URL', st.secrets.get('SUPABASE_URL', ''))
+        os.environ.setdefault('SUPABASE_ANON_KEY', st.secrets.get('SUPABASE_KEY', ''))
+        os.environ.setdefault('GEMINI_API_KEY', st.secrets.get('GEMINI_API_KEY', ''))
+except Exception:
+    pass
 
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
 TAVILY_API_KEY = os.getenv("TAVILY_API_KEY")
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 
 _required = {
     "ANTHROPIC_API_KEY": ANTHROPIC_API_KEY,
@@ -21,7 +35,7 @@ _missing = [name for name, value in _required.items() if not value]
 if _missing:
     raise RuntimeError(
         f"Missing required environment variable(s): {', '.join(_missing)}. "
-        "Set them in your .env file."
+        "Set them in your .env file or Streamlit secrets."
     )
 
 VALID_DOMAINS = [

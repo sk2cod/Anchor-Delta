@@ -523,7 +523,8 @@ def research_card(query: str) -> dict:
     Use Gemini 2.5 Flash with grounding to research a topic and produce
     a full Anchor & Delta card in our standard format.
     """
-    client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+    from config import GEMINI_API_KEY
+    client = genai.Client(api_key=GEMINI_API_KEY)
 
     prompt = f"""
 You are writing a personal intelligence briefing card. Research this topic using current web sources: "{query}"
