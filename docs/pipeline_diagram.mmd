@@ -1,0 +1,73 @@
+flowchart TD
+    subgraph SOURCES["Sources"]
+        RSS["RSS Feeds\n19 feeds · 5 domains"]
+        TAV["Tavily\ndynamic card queries"]
+        UQ["User Query\noptional topic input"]
+        GEM["Gemini 2.5 Flash\nresearch button only"]
+    end
+
+    subgraph FETCH["Fetch and Prepare"]
+        COMBINE["Combine + URL dedup"]
+        ENRICH["Body Enrichment\nhttpx + BeautifulSoup\n150 to 2400 chars avg"]
+    end
+
+    subgraph GATES["Filter Gates"]
+        G3["Gate 3\nKeyword blocklist"]
+        G4["Gate 4\nFreshness 48h / 96h AI Tech"]
+        G1["Gate 1\nURL hash uniqueness"]
+        G2["Gate 2\nSimHash + TF-IDF 0.25"]
+        NOISE["Noise log"]
+    end
+
+    subgraph LLM["LLM Pipeline Anthropic"]
+        HAIKU["Haiku router\nclassify noise / existing card / new frame\ncard clustering by structural thesis"]
+        EXTRACT["Sonnet extractor\nnamed actors quotes events dates"]
+        COMPOSE["Sonnet composer\nnew card anchor + delta + transmission\ndelta update new chapter + tldr hook\nvoice direct zero specialist knowledge"]
+        COST["Cost guard\n$0.50 per domain\n$0.60 all domains"]
+    end
+
+    subgraph DB["Supabase Database"]
+        CARDS["cards\ndomain anchor title is_archived"]
+        DELTA["delta_events\ntldr headline what_happened quotes date"]
+        TRANS["transmissions\nchain_latex nodes_markdown"]
+        PROC["processed_articles\nURL hashes for Gate 1"]
+        ARCHIVE["auto-archive\n7 days no updates archived\nmanual archive per card\nper-card delete"]
+    end
+
+    subgraph UI["Streamlit UI"]
+        TABS["5 Domain Tabs\nWorld Finance AI Tech Australia India"]
+        CARD_VIEW["Card view order\ntldr hook latest delta core anchor\nprevious chapters collapsed transmission"]
+        SIDEBAR["Sidebar pipeline buttons\nWorld Finance AI Tech Australia India All Domains"]
+        RESEARCH["Gemini research button\ntype any topic full card with web grounding"]
+    end
+
+    RSS --> COMBINE
+    TAV --> COMBINE
+    UQ --> COMBINE
+    COMBINE --> ENRICH
+    ENRICH --> G3
+    G3 -->|pass| G4
+    G3 -->|blocked| NOISE
+    G4 -->|pass| G1
+    G4 -->|too old| NOISE
+    G1 -->|new URL| G2
+    G1 -->|seen URL| NOISE
+    G2 -->|unique| HAIKU
+    G2 -->|duplicate| NOISE
+    HAIKU -->|noise| NOISE
+    HAIKU -->|signal| EXTRACT
+    EXTRACT --> COMPOSE
+    COMPOSE --> COST
+    COST -->|within budget| CARDS
+    COST -->|exceeded| NOISE
+    CARDS --> DELTA
+    CARDS --> TRANS
+    CARDS --> PROC
+    CARDS --> ARCHIVE
+    CARDS --> TABS
+    DELTA --> TABS
+    TRANS --> TABS
+    TABS --> CARD_VIEW
+    CARD_VIEW --> SIDEBAR
+    GEM -->|separate path no gates direct to DB| CARDS
+    RESEARCH --> GEM
