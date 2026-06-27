@@ -1,6 +1,9 @@
+import logging
 from datetime import datetime, timedelta, timezone
 
 from db.client import supabase_client
+
+logger = logging.getLogger(__name__)
 
 
 def create_card(domain, umbrella_title, anchor_text):
@@ -77,6 +80,24 @@ def delete_card(card_id: str):
     supabase_client.table('delta_events').delete().eq('card_id', card_id).execute()
     supabase_client.table('transmissions').delete().eq('card_id', card_id).execute()
     supabase_client.table('cards').delete().eq('id', card_id).execute()
+
+
+def archive_stale_cards(days: int = 7) -> int:
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+    result = supabase_client.table("cards")\
+        .select("id, umbrella_title, last_delta_at")\
+        .eq("is_archived", False)\
+        .lt("last_delta_at", cutoff)\
+        .execute()
+    archived_count = 0
+    for card in result.data:
+        supabase_client.table("cards")\
+            .update({"is_archived": True})\
+            .eq("id", card["id"])\
+            .execute()
+        archived_count += 1
+        logger.info(f"Auto-archived stale card: {card['umbrella_title']}")
+    return archived_count
 
 
 def hard_delete_all_cards() -> dict:

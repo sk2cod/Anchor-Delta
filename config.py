@@ -34,6 +34,7 @@ VALID_DOMAINS = [
 
 MAX_ACTIVE_CARDS = 25
 ARCHIVE_AFTER_DAYS = 14
+STALE_CARD_DAYS = 7
 SYDNEY_TZ = "Australia/Sydney"
 
 # Pipeline freshness window

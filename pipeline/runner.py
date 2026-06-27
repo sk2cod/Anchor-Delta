@@ -1,6 +1,7 @@
 import logging
 
-from db.cards import get_active_cards
+from config import STALE_CARD_DAYS
+from db.cards import archive_stale_cards, get_active_cards
 from db.noise_log import log_noise
 from pipeline.engine import get_run_stats, reset_run_stats
 from pipeline.fetcher import TavilyFetcher
@@ -14,6 +15,10 @@ COST_GUARD_USD = 1.00
 
 def run_pipeline(extra_queries: list[str] = None, progress_callback=None, domain=None):
     reset_run_stats()
+
+    archived = archive_stale_cards(days=STALE_CARD_DAYS)
+    if archived > 0:
+        logger.info(f"Auto-archived {archived} stale cards")
 
     fetcher = TavilyFetcher()
 
@@ -63,4 +68,5 @@ def run_pipeline(extra_queries: list[str] = None, progress_callback=None, domain
         "survived_filter": len(survivors),
         "results": results,
         "run_stats": get_run_stats(),
+        "archived": archived,
     }

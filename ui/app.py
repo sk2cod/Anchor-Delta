@@ -556,6 +556,9 @@ with st.sidebar:
         col_sonnet.metric("Sonnet calls", run_stats.get("sonnet_calls", 0))
         col_cost.metric("Est. cost", f"${run_stats.get('estimated_cost_usd', 0):.2f}")
 
+        if last_run_results.get("archived", 0) > 0:
+            st.info(f"📦 {last_run_results['archived']} stale cards archived")
+
         status_counts = {"created": 0, "updated": 0, "noise": 0, "capped": 0, "error": 0}
         for result in results:
             status_counts[result["status"]] = status_counts.get(result["status"], 0) + 1
