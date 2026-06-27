@@ -53,11 +53,14 @@ def process_article(article):
             update_last_delta_at(route_result.card_id)
 
             if result.transmission_needs_update is True:
-                upsert_transmission(
-                    card_id=route_result.card_id,
-                    chain_latex=result.chain_latex,
-                    nodes_markdown=result.nodes_markdown,
-                )
+                if result.chain_latex and result.nodes_markdown:
+                    upsert_transmission(
+                        card_id=route_result.card_id,
+                        chain_latex=result.chain_latex,
+                        nodes_markdown=result.nodes_markdown,
+                    )
+                else:
+                    logger.warning(f"Skipping transmission upsert — chain_latex or nodes_markdown is null for card {route_result.card_id}")
 
             return {"status": "updated", "card_id": route_result.card_id}
 
@@ -90,11 +93,14 @@ def process_article(article):
                 dialogue=[t.dict() for t in result.dialogue],
                 tldr=result.tldr,
             )
-            upsert_transmission(
-                card_id=new_card["id"],
-                chain_latex=result.chain_latex,
-                nodes_markdown=result.nodes_markdown,
-            )
+            if result.chain_latex and result.nodes_markdown:
+                upsert_transmission(
+                    card_id=new_card["id"],
+                    chain_latex=result.chain_latex,
+                    nodes_markdown=result.nodes_markdown,
+                )
+            else:
+                logger.warning(f"Skipping transmission upsert — chain_latex or nodes_markdown is null for card {new_card['id']}")
 
             return {"status": "created", "card_id": new_card["id"]}
 
