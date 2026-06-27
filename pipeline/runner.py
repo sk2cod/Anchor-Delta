@@ -1,6 +1,6 @@
 import logging
 
-from config import STALE_CARD_DAYS
+from config import ALL_DOMAINS_COST_GUARD_USD, DOMAIN_COST_GUARD_USD, STALE_CARD_DAYS
 from db.cards import archive_stale_cards, get_active_cards
 from db.noise_log import log_noise
 from pipeline.engine import get_run_stats, reset_run_stats
@@ -10,11 +10,10 @@ from pipeline.orchestrator import process_article
 
 logger = logging.getLogger(__name__)
 
-COST_GUARD_USD = 1.00
-
 
 def run_pipeline(extra_queries: list[str] = None, progress_callback=None, domain=None):
     reset_run_stats()
+    cost_limit = DOMAIN_COST_GUARD_USD if domain is not None else ALL_DOMAINS_COST_GUARD_USD
 
     archived = archive_stale_cards(days=STALE_CARD_DAYS)
     if archived > 0:
@@ -54,12 +53,12 @@ def run_pipeline(extra_queries: list[str] = None, progress_callback=None, domain
         if progress_callback is not None:
             progress_callback(results)
 
-        if get_run_stats()["estimated_cost_usd"] >= COST_GUARD_USD:
+        if get_run_stats()["estimated_cost_usd"] >= cost_limit:
             log_noise(
                 headline="COST GUARD TRIGGERED",
                 source_url="system",
                 gate_failed="cost_guard",
-                reason=f"Estimated cost ${get_run_stats()['estimated_cost_usd']:.4f} exceeded limit ${COST_GUARD_USD}"
+                reason=f"Estimated cost ${get_run_stats()['estimated_cost_usd']:.4f} exceeded limit ${cost_limit}"
             )
             break
 
