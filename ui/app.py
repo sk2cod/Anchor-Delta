@@ -290,27 +290,33 @@ def render_card(card_data):
 
         # Archive and Delete buttons
         st.markdown(_THIN_DIVIDER, unsafe_allow_html=True)
-        col1, col2, col3 = st.columns([5, 1, 1])
-        with col2:
-            if st.button("📦", key=f"archive_{card['id']}", help="Archive this card"):
-                st.session_state[f"confirm_archive_{card['id']}"] = True
-        with col3:
-            if st.button("🗑️", key=f"delete_{card['id']}", help="Delete this card permanently"):
-                st.session_state[f"confirm_delete_{card['id']}"] = True
+        if not card.get('is_archived', False):
+            col1, col2, col3 = st.columns([5, 1, 1])
+            with col2:
+                if st.button("📦", key=f"archive_{card['id']}", help="Archive this card"):
+                    st.session_state[f"confirm_archive_{card['id']}"] = True
+            with col3:
+                if st.button("🗑️", key=f"delete_{card['id']}", help="Delete this card permanently"):
+                    st.session_state[f"confirm_delete_{card['id']}"] = True
 
-        if st.session_state.get(f"confirm_archive_{card['id']}", False):
-            st.warning("Move this card to Archive?")
-            col_yes, col_no = st.columns([1, 1])
-            with col_yes:
-                if st.button("Yes, archive", key=f"archive_yes_{card['id']}"):
-                    from db.cards import archive_card
-                    archive_card(card['id'])
-                    st.session_state[f"confirm_archive_{card['id']}"] = False
-                    st.rerun()
-            with col_no:
-                if st.button("Cancel", key=f"archive_no_{card['id']}"):
-                    st.session_state[f"confirm_archive_{card['id']}"] = False
-                    st.rerun()
+            if st.session_state.get(f"confirm_archive_{card['id']}", False):
+                st.warning("Move this card to Archive?")
+                col_yes, col_no = st.columns([1, 1])
+                with col_yes:
+                    if st.button("Yes, archive", key=f"archive_yes_{card['id']}"):
+                        from db.cards import archive_card
+                        archive_card(card['id'])
+                        st.session_state[f"confirm_archive_{card['id']}"] = False
+                        st.rerun()
+                with col_no:
+                    if st.button("Cancel", key=f"archive_no_{card['id']}"):
+                        st.session_state[f"confirm_archive_{card['id']}"] = False
+                        st.rerun()
+        else:
+            col1, col2 = st.columns([6, 1])
+            with col2:
+                if st.button("🗑️", key=f"delete_{card['id']}", help="Delete this card permanently"):
+                    st.session_state[f"confirm_delete_{card['id']}"] = True
 
         if st.session_state.get(f"confirm_delete_{card['id']}", False):
             st.warning("Delete this card permanently?")
