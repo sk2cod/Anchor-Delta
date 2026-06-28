@@ -3,12 +3,13 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import re
+from collections import Counter
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
 import streamlit as st
 
-from config import FRESHNESS_HOURS
+from config import FRESHNESS_HOURS, MAX_ACTIVE_CARDS
 from db.cards import get_active_cards, get_archived_cards, get_card_by_id
 from db.delta_events import get_delta_events_for_card, get_last_run_per_domain
 from db.noise_log import get_noise_log_since
@@ -632,8 +633,18 @@ if FRESHNESS_HOURS > 48:
 # ── Domain tabs ───────────────────────────────────────────────────────────────
 
 domain_last_run = get_last_run_per_domain()
+active_cards = get_active_cards()
+domain_counts = Counter(c['domain'] for c in active_cards)
+total = len(active_cards)
+st.caption(f"Active cards: {total} / {MAX_ACTIVE_CARDS}")
 
-tabs = st.tabs(["🌍 World", "💹 Finance", "🤖 AI & Tech", "🌏 Australia", "🌐 India"])
+tabs = st.tabs([
+    f"🌍 World ({domain_counts.get('world', 0)})",
+    f"💹 Finance ({domain_counts.get('finance', 0)})",
+    f"🤖 AI & Tech ({domain_counts.get('ai_tech', 0)})",
+    f"🌏 Australia ({domain_counts.get('australia', 0)})",
+    f"🌐 India ({domain_counts.get('india', 0)})",
+])
 
 with tabs[0]:
     render_domain_tab("world", domain_last_run)
