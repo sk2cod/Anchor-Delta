@@ -10,7 +10,7 @@ import streamlit as st
 
 from config import FRESHNESS_HOURS
 from db.cards import get_active_cards, get_archived_cards, get_card_by_id
-from db.delta_events import get_delta_events_for_card
+from db.delta_events import get_delta_events_for_card, get_last_run_per_domain
 from db.noise_log import get_noise_log_since
 from db.transmissions import get_transmission_for_card
 from pipeline.runner import run_pipeline
@@ -351,8 +351,7 @@ DOMAIN_KEYS = {
 DOMAIN_PLACEHOLDER = "No active cards in this domain yet. Run the pipeline to fetch stories."
 
 
-def _format_domain_last_run(domain_key: str) -> str:
-    domain_last_run = st.session_state.get("domain_last_run", {})
+def _format_domain_last_run(domain_key: str, domain_last_run: dict) -> str:
     iso = domain_last_run.get(domain_key)
     if not iso:
         return "never run"
@@ -365,8 +364,8 @@ def _format_domain_last_run(domain_key: str) -> str:
     return "last run " + dt.strftime("%d %b")
 
 
-def render_domain_tab(domain_key):
-    st.caption(_format_domain_last_run(domain_key))
+def render_domain_tab(domain_key, domain_last_run):
+    st.caption(_format_domain_last_run(domain_key, domain_last_run))
     cards = get_active_cards(domain=domain_key)
     if not cards:
         st.info(DOMAIN_PLACEHOLDER)
@@ -589,12 +588,6 @@ if _run_triggered:
     st.session_state["last_run_results"] = run_results
     _now_iso = datetime.now(ZoneInfo("Australia/Sydney")).isoformat()
     st.session_state["last_run_at"] = _now_iso
-    if "domain_last_run" not in st.session_state:
-        st.session_state.domain_last_run = {}
-    _all_domains = ["world", "finance", "ai_tech", "australia", "india"]
-    _domains_to_update = _all_domains if _run_domain is None else [_run_domain]
-    for _d in _domains_to_update:
-        st.session_state.domain_last_run[_d] = _now_iso
     st.success("Pipeline complete.")
     st.rerun()
 
@@ -638,22 +631,24 @@ if FRESHNESS_HOURS > 48:
 
 # ── Domain tabs ───────────────────────────────────────────────────────────────
 
+domain_last_run = get_last_run_per_domain()
+
 tabs = st.tabs(["🌍 World", "💹 Finance", "🤖 AI & Tech", "🌏 Australia", "🌐 India"])
 
 with tabs[0]:
-    render_domain_tab("world")
+    render_domain_tab("world", domain_last_run)
 
 with tabs[1]:
-    render_domain_tab("finance")
+    render_domain_tab("finance", domain_last_run)
 
 with tabs[2]:
-    render_domain_tab("ai_tech")
+    render_domain_tab("ai_tech", domain_last_run)
 
 with tabs[3]:
-    render_domain_tab("australia")
+    render_domain_tab("australia", domain_last_run)
 
 with tabs[4]:
-    render_domain_tab("india")
+    render_domain_tab("india", domain_last_run)
 
 # ── Archive ───────────────────────────────────────────────────────────────────
 
