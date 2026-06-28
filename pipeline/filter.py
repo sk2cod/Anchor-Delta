@@ -60,7 +60,7 @@ def _parse_published_date(date_str):
     return None
 
 
-def _gate_1_url_uniqueness(article, seen_urls):
+def _gate_1_url_uniqueness(article, seen_urls, run_id=None):
     url_hash = _url_hash(article["url"])
     # is_url_seen only covers prior runs (mark_article_processed fires at the
     # end of this run), so duplicates within the same batch need a local set.
@@ -70,6 +70,7 @@ def _gate_1_url_uniqueness(article, seen_urls):
             source_url=article["url"],
             gate_failed="gate_1",
             reason="duplicate url",
+            run_id=run_id,
         )
         return False
     seen_urls.add(url_hash)
@@ -96,7 +97,7 @@ def _find_tfidf_match_index(new_text, seen_texts, threshold=TFIDF_THRESHOLD):
     return best_index
 
 
-def _gate_2_dedup(article, seen_simhashes, seen_texts, seen_lengths, seen_articles, survivors):
+def _gate_2_dedup(article, seen_simhashes, seen_texts, seen_lengths, seen_articles, survivors, run_id=None):
     article["_headline_hash"] = _headline_hash(article.get("title", ""))
 
     title = article.get("title", "")
@@ -130,6 +131,7 @@ def _gate_2_dedup(article, seen_simhashes, seen_texts, seen_lengths, seen_articl
                 source_url=existing_article["url"],
                 gate_failed="gate_2",
                 reason="near-duplicate headline, shorter content discarded",
+                run_id=run_id,
             )
             seen_simhashes[match_index] = new_simhash
             seen_texts[match_index] = text
@@ -142,6 +144,7 @@ def _gate_2_dedup(article, seen_simhashes, seen_texts, seen_lengths, seen_articl
             source_url=article["url"],
             gate_failed="gate_2",
             reason="near-duplicate headline, shorter content discarded",
+            run_id=run_id,
         )
         return False
 
@@ -152,7 +155,7 @@ def _gate_2_dedup(article, seen_simhashes, seen_texts, seen_lengths, seen_articl
     return True
 
 
-def _gate_3_keyword_filter(article):
+def _gate_3_keyword_filter(article, run_id=None):
     title_lower = article.get("title", "").lower()
     for term in BLOCKLIST:
         if term in title_lower:
@@ -161,6 +164,7 @@ def _gate_3_keyword_filter(article):
                 source_url=article["url"],
                 gate_failed="gate_3",
                 reason=f"blocked keyword: {term}",
+                run_id=run_id,
             )
             return False
     return True
@@ -169,7 +173,7 @@ def _gate_3_keyword_filter(article):
 _AI_TECH_FRESHNESS_HOURS = 96
 
 
-def _gate_4_freshness_check(article):
+def _gate_4_freshness_check(article, run_id=None):
     now_sydney = datetime.now(SYDNEY_TZ)
     parsed = _parse_published_date(article.get("published_date"))
 
@@ -188,6 +192,7 @@ def _gate_4_freshness_check(article):
                 source_url=article["url"],
                 gate_failed="gate_4",
                 reason=f"article from previous year ({parsed_sydney.year}), rejected",
+                run_id=run_id,
             )
             return None
 
@@ -197,6 +202,7 @@ def _gate_4_freshness_check(article):
                 source_url=article["url"],
                 gate_failed="gate_4",
                 reason=f"article older than {freshness_hours} hours",
+                run_id=run_id,
             )
             return None
 
@@ -210,19 +216,20 @@ def _gate_4_freshness_check(article):
         source_url=article["url"],
         gate_failed="gate_4_warning",
         reason="missing timestamp, fallback applied",
+        run_id=run_id,
     )
     return article
 
 
-def run_filter_pipeline(articles, fetcher=None):
+def run_filter_pipeline(articles, fetcher=None, run_id=None):
     # Gate 3 and Gate 4 first — cheap checks, no API calls or DB lookups,
     # so obvious noise is eliminated before paying for body enrichment.
     cheap_survivors = []
     for article in articles:
-        if not _gate_3_keyword_filter(article):
+        if not _gate_3_keyword_filter(article, run_id=run_id):
             continue
 
-        article = _gate_4_freshness_check(article)
+        article = _gate_4_freshness_check(article, run_id=run_id)
         if article is None:
             continue
 
@@ -241,10 +248,10 @@ def run_filter_pipeline(articles, fetcher=None):
     seen_urls = set()
 
     for article in cheap_survivors:
-        if not _gate_1_url_uniqueness(article, seen_urls):
+        if not _gate_1_url_uniqueness(article, seen_urls, run_id=run_id):
             continue
 
-        if not _gate_2_dedup(article, seen_simhashes, seen_texts, seen_lengths, seen_articles, survivors):
+        if not _gate_2_dedup(article, seen_simhashes, seen_texts, seen_lengths, seen_articles, survivors, run_id=run_id):
             continue
 
         survivors.append(article)

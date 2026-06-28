@@ -44,7 +44,7 @@ def _find_keyword_match(article: dict, active_cards: list) -> str | None:
     return None
 
 
-def process_article(article):
+def process_article(article, run_id=None):
     try:
         active_cards = get_active_cards()
 
@@ -66,6 +66,7 @@ def process_article(article):
                 source_url=article["url"],
                 gate_failed="llm_route",
                 reason=route_result.reason,
+                run_id=run_id,
             )
             return {"status": "noise", "article_title": article["title"]}
 
@@ -104,6 +105,7 @@ def process_article(article):
                     source_url=article["url"],
                     gate_failed="llm_route",
                     reason="max active cards reached",
+                    run_id=run_id,
                 )
                 return {"status": "capped", "article_title": article["title"]}
 
@@ -143,6 +145,7 @@ def process_article(article):
             headline=article.get("title", "unknown"),
             source_url=article.get("url", "unknown"),
             gate_failed="error",
-            reason=str(e)
+            reason=str(e),
+            run_id=run_id,
         )
         return {"status": "error", "reason": str(e), "article_title": article.get("title", "unknown")}

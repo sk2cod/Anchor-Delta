@@ -108,8 +108,9 @@ def _chain_latex_to_text(latex: str) -> str:
     return text.strip()
 
 
-def _format_card_header(card):
-    last_updated = datetime.fromisoformat(str(card["last_delta_at"]).replace("Z", "+00:00")).astimezone(
+def _format_card_header(card, last_updated_at=None):
+    ts = last_updated_at or card["last_delta_at"]
+    last_updated = datetime.fromisoformat(str(ts).replace("Z", "+00:00")).astimezone(
         ZoneInfo("Australia/Sydney")
     )
     now_sydney = datetime.now(ZoneInfo("Australia/Sydney"))
@@ -238,7 +239,12 @@ def render_card(card_data):
     latest = delta_events[0] if delta_events else None
     older = delta_events[1:] if delta_events else []
 
-    with st.expander(_format_card_header(card)):
+    last_updated_at = (
+        max(e["created_at"] for e in delta_events if e.get("created_at"))
+        if delta_events else None
+    )
+
+    with st.expander(_format_card_header(card, last_updated_at=last_updated_at)):
         if latest and latest.get("tldr"):
             st.markdown(
                 f"<p style='font-size:17px;font-weight:500;border-left:4px solid #E24B4A;"
@@ -341,7 +347,22 @@ DOMAIN_KEYS = {
 DOMAIN_PLACEHOLDER = "No active cards in this domain yet. Run the pipeline to fetch stories."
 
 
+def _format_domain_last_run(domain_key: str) -> str:
+    domain_last_run = st.session_state.get("domain_last_run", {})
+    iso = domain_last_run.get(domain_key)
+    if not iso:
+        return "never run"
+    dt = datetime.fromisoformat(iso).astimezone(ZoneInfo("Australia/Sydney"))
+    now = datetime.now(ZoneInfo("Australia/Sydney"))
+    if dt.date() == now.date():
+        return "last run today at " + dt.strftime("%I:%M %p").lstrip("0")
+    if (now.date() - dt.date()).days == 1:
+        return "last run yesterday"
+    return "last run " + dt.strftime("%d %b")
+
+
 def render_domain_tab(domain_key):
+    st.caption(_format_domain_last_run(domain_key))
     cards = get_active_cards(domain=domain_key)
     if not cards:
         st.info(DOMAIN_PLACEHOLDER)
@@ -514,7 +535,14 @@ with col3:
 _run_triggered = False
 _run_domain = None
 
-if st.session_state.pending_domain != "NOT_SET":
+if "pipeline_running" not in st.session_state:
+    st.session_state.pipeline_running = False
+
+if st.session_state.pipeline_running:
+    _running_label = _DOMAIN_LABELS.get(st.session_state.get("_running_domain", "NOT_SET"), "🚀 All Domains")
+    st.info(f"⚙️ Running {_running_label} pipeline...")
+
+elif st.session_state.pending_domain != "NOT_SET":
     _pending = st.session_state.pending_domain
     _label = _DOMAIN_LABELS.get(_pending, "🚀 All Domains")
     col_msg, col_confirm, col_cancel = st.columns([4, 1, 1])
@@ -525,6 +553,8 @@ if st.session_state.pending_domain != "NOT_SET":
             _run_domain = _pending
             _run_triggered = True
             st.session_state.pending_domain = "NOT_SET"
+            st.session_state.pipeline_running = True
+            st.session_state["_running_domain"] = _pending
     with col_cancel:
         if st.button("❌ Cancel", use_container_width=True):
             st.session_state.pending_domain = "NOT_SET"
@@ -543,15 +573,23 @@ if _run_triggered:
             f"Noise: {counts['noise']}"
         )
 
-    with st.spinner("Fetching and filtering news sources..."):
+    with st.spinner(f"Fetching and filtering news sources..."):
         run_results = run_pipeline(
             extra_queries=[user_query] if user_query else None,
             progress_callback=_update_progress,
             domain=_run_domain,
         )
     progress_placeholder.empty()
+    st.session_state.pipeline_running = False
     st.session_state["last_run_results"] = run_results
-    st.session_state["last_run_at"] = datetime.now(ZoneInfo("Australia/Sydney")).isoformat()
+    _now_iso = datetime.now(ZoneInfo("Australia/Sydney")).isoformat()
+    st.session_state["last_run_at"] = _now_iso
+    if "domain_last_run" not in st.session_state:
+        st.session_state.domain_last_run = {}
+    _all_domains = ["world", "finance", "ai_tech", "australia", "india"]
+    _domains_to_update = _all_domains if _run_domain is None else [_run_domain]
+    for _d in _domains_to_update:
+        st.session_state.domain_last_run[_d] = _now_iso
     st.success("Pipeline complete.")
     st.rerun()
 

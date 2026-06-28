@@ -1,4 +1,5 @@
 import logging
+import uuid
 
 from config import ALL_DOMAINS_COST_GUARD_USD, DOMAIN_COST_GUARD_USD, STALE_CARD_DAYS
 from db.cards import archive_stale_cards, get_active_cards
@@ -13,6 +14,7 @@ logger = logging.getLogger(__name__)
 
 def run_pipeline(extra_queries: list[str] = None, progress_callback=None, domain=None):
     reset_run_stats()
+    run_id = str(uuid.uuid4())[:8]
     cost_limit = DOMAIN_COST_GUARD_USD if domain is not None else ALL_DOMAINS_COST_GUARD_USD
 
     archived = archive_stale_cards(days=STALE_CARD_DAYS)
@@ -52,13 +54,13 @@ def run_pipeline(extra_queries: list[str] = None, progress_callback=None, domain
         seen_urls.add(article["url"])
         deduped.append(article)
 
-    survivors = run_filter_pipeline(deduped, fetcher=fetcher)
+    survivors = run_filter_pipeline(deduped, fetcher=fetcher, run_id=run_id)
     fetch_stats["survived_filter"] = len(survivors)
 
     results = []
     total_processed = 0
     for article in survivors:
-        results.append(process_article(article))
+        results.append(process_article(article, run_id=run_id))
         total_processed += 1
 
         if progress_callback is not None:
@@ -69,7 +71,8 @@ def run_pipeline(extra_queries: list[str] = None, progress_callback=None, domain
                 headline="COST GUARD TRIGGERED",
                 source_url="system",
                 gate_failed="cost_guard",
-                reason=f"Estimated cost ${get_run_stats()['estimated_cost_usd']:.4f} exceeded limit ${cost_limit}"
+                reason=f"Estimated cost ${get_run_stats()['estimated_cost_usd']:.4f} exceeded limit ${cost_limit}",
+                run_id=run_id,
             )
             break
 
@@ -82,4 +85,5 @@ def run_pipeline(extra_queries: list[str] = None, progress_callback=None, domain
         "run_stats": get_run_stats(),
         "archived": archived,
         "fetch_stats": fetch_stats,
+        "run_id": run_id,
     }

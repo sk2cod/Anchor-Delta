@@ -10,7 +10,7 @@ from db.cards import (
     update_last_delta_at,
 )
 from db.delta_events import append_delta_event, get_delta_events_for_card
-from db.noise_log import get_noise_log_since, log_noise
+from db.noise_log import get_noise_log_by_run_id, get_noise_log_since, log_noise
 from db.processed_articles import (
     is_headline_seen,
     is_url_seen,
@@ -37,4 +37,5 @@ __all__ = [
     "mark_article_processed",
     "log_noise",
     "get_noise_log_since",
+    "get_noise_log_by_run_id",
 ]
