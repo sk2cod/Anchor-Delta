@@ -547,9 +547,13 @@ if last_run_results:
 
     st.caption(
         f"Last run: {timestamp_str} · "
-        f"Fetched {rss_fetched} · Survived filter {survived_filter} · Processed {reached_llm} · "
-        f"{status_counts['created']} created · {status_counts['updated']} updated · "
-        f"Est. cost ${cost:.2f} · {elapsed}"
+        f"Fetched {rss_fetched} · Survived filter {survived_filter} · Processed {reached_llm} · {elapsed}"
+    )
+    st.caption(
+        f"Created {status_counts['created']} · Updated {status_counts['updated']} · "
+        f"Noise {status_counts['noise']} · Capped {status_counts['capped']} · Error {status_counts['error']} · "
+        f"Haiku {run_stats.get('haiku_calls', 0)} · Sonnet {run_stats.get('sonnet_calls', 0)} · "
+        f"Est. cost ${cost:.2f}"
     )
 
     if last_run_results.get("archived", 0) > 0:
