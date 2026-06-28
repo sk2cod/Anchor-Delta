@@ -506,14 +506,21 @@ def compose_new_card(article, extraction, domain):
 
 
 def compose_delta_update(article, extraction, existing_card, delta_history):
-    user_content = json.dumps(
-        {
-            "content": article.get("content", ""),
-            "existing_card": existing_card,
-            "delta_history": delta_history,
-            "extraction": extraction.model_dump(mode="json"),
-        }
-    )
+    user_content = json.dumps({
+        "content": article.get("content", ""),
+        "existing_card": {
+            "umbrella_title": existing_card.get("umbrella_title", ""),
+            "anchor_text": existing_card.get("anchor_text", "")
+        },
+        "delta_history": delta_history[-2:] if delta_history else [],
+        "extraction": {
+            "event_date": str(extraction.event_date) if extraction.event_date else None,
+            "event_headline": extraction.event_headline,
+            "what_happened": extraction.what_happened,
+            "dialogue": [{"speaker": d.speaker, "quote": d.quote} for d in extraction.dialogue],
+            "named_actors": extraction.named_actors,
+        },
+    })
     response, result = _call_structured(
         COMPOSE_MODEL, COMPOSE_DELTA_UPDATE_SYSTEM_PROMPT, user_content, DeltaUpdateResult
     )
