@@ -458,7 +458,6 @@ def route_article(article, active_cards):
 
     system_prompt = ROUTE_SYSTEM_PROMPT.replace("{user_profile}", USER_PROFILE.strip())
     response, result = _call_structured(ROUTE_MODEL, system_prompt, user_content, RouteResult)
-    print(f"[COST DEBUG] route_article via {ROUTE_MODEL}: input={response.usage.input_tokens} output={response.usage.output_tokens}")
 
     RUN_STATS["haiku_calls"] += 1
     RUN_STATS["haiku_input_tokens"] += response.usage.input_tokens
@@ -480,7 +479,6 @@ def extract_article(article):
     response, result = _call_structured(
         EXTRACT_MODEL, EXTRACT_SYSTEM_PROMPT, user_content, ExtractionResult
     )
-    print(f"[COST DEBUG] extract_article via {EXTRACT_MODEL}: input={response.usage.input_tokens} output={response.usage.output_tokens}")
 
     RUN_STATS["sonnet_calls"] += 1
     RUN_STATS["sonnet_input_tokens"] += response.usage.input_tokens
@@ -500,7 +498,6 @@ def compose_new_card(article, extraction, domain):
     response, result = _call_structured(
         COMPOSE_MODEL, COMPOSE_NEW_CARD_SYSTEM_PROMPT, user_content, NewCardResult
     )
-    print(f"[COST DEBUG] compose_new_card via {COMPOSE_MODEL}: input={response.usage.input_tokens} output={response.usage.output_tokens}")
 
     RUN_STATS["sonnet_calls"] += 1
     RUN_STATS["sonnet_input_tokens"] += response.usage.input_tokens
@@ -528,7 +525,6 @@ def compose_delta_update(article, extraction, existing_card, delta_history):
     response, result = _call_structured(
         DELTA_MODEL, COMPOSE_DELTA_UPDATE_SYSTEM_PROMPT, user_content, DeltaUpdateResult
     )
-    print(f"[COST DEBUG] compose_delta_update via {DELTA_MODEL}: input={response.usage.input_tokens} output={response.usage.output_tokens}")
 
     RUN_STATS["haiku_calls"] += 1
     RUN_STATS["haiku_input_tokens"] += response.usage.input_tokens
