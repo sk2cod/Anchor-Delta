@@ -472,34 +472,63 @@ if research_clicked and user_query:
 
 # ── Pipeline buttons ──────────────────────────────────────────────────────────
 
+_DOMAIN_LABELS = {
+    "world": "🌍 World",
+    "finance": "💹 Finance",
+    "ai_tech": "🤖 AI & Tech",
+    "australia": "🌏 Australia",
+    "india": "🌐 India",
+    None: "🚀 All Domains",
+}
+
+if "pending_domain" not in st.session_state:
+    st.session_state.pending_domain = "NOT_SET"
+
 st.markdown("**Run Pipeline**")
 col1, col2, col3 = st.columns(3)
-_run_domain = None
-_run_triggered = False
 
 with col1:
     if st.button("🌍 World", use_container_width=True):
-        _run_domain = "world"
-        _run_triggered = True
+        st.session_state.pending_domain = "world"
+        st.rerun()
     if st.button("🌏 Australia", use_container_width=True):
-        _run_domain = "australia"
-        _run_triggered = True
+        st.session_state.pending_domain = "australia"
+        st.rerun()
 
 with col2:
     if st.button("💹 Finance", use_container_width=True):
-        _run_domain = "finance"
-        _run_triggered = True
+        st.session_state.pending_domain = "finance"
+        st.rerun()
     if st.button("🌐 India", use_container_width=True):
-        _run_domain = "india"
-        _run_triggered = True
+        st.session_state.pending_domain = "india"
+        st.rerun()
 
 with col3:
     if st.button("🤖 AI & Tech", use_container_width=True):
-        _run_domain = "ai_tech"
-        _run_triggered = True
+        st.session_state.pending_domain = "ai_tech"
+        st.rerun()
     if st.button("🚀 All Domains", use_container_width=True):
-        _run_domain = None
-        _run_triggered = True
+        st.session_state.pending_domain = None
+        st.rerun()
+
+_run_triggered = False
+_run_domain = None
+
+if st.session_state.pending_domain != "NOT_SET":
+    _pending = st.session_state.pending_domain
+    _label = _DOMAIN_LABELS.get(_pending, "🚀 All Domains")
+    col_msg, col_confirm, col_cancel = st.columns([4, 1, 1])
+    with col_msg:
+        st.info(f"▶ Run {_label} pipeline?")
+    with col_confirm:
+        if st.button("✅ Confirm", use_container_width=True):
+            _run_domain = _pending
+            _run_triggered = True
+            st.session_state.pending_domain = "NOT_SET"
+    with col_cancel:
+        if st.button("❌ Cancel", use_container_width=True):
+            st.session_state.pending_domain = "NOT_SET"
+            st.rerun()
 
 if _run_triggered:
     progress_placeholder = st.empty()
