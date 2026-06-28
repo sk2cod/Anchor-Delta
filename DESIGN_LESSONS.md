@@ -246,6 +246,59 @@ A living reference document capturing every issue encountered, root cause, and f
 
 ---
 
+## 12. Cost Optimisation Learnings
+
+### The real cost drivers (in order of impact)
+1. Number of active cards — each active card adds anchor_text tokens to every Haiku routing call. 20 cards = 5,300 input tokens per call. 2 cards = 1,800 tokens. Archive stale cards aggressively.
+2. New card creation — each new card costs 2 Sonnet calls (extraction + composition). ~$0.056 per new card. Discovery runs are expensive, maintenance runs are cheap.
+3. Haiku routing volume — every article that survives gates gets 1 Haiku routing call. 34 articles reaching Haiku = $0.17 just in routing. Reduce with better gate filtering and keyword pre-matching.
+4. Sonnet extraction — always uses Sonnet regardless of new card or delta update. Cannot be avoided but input is now capped.
+
+### Cost optimisations applied
+- delta_history trimmed to last 2 events (was full history)
+- existing_card context trimmed to umbrella_title + anchor_text only
+- extraction fields trimmed to 5 necessary fields (removed tactical_moves, named_consequences)
+- Pre-LLM keyword matching — articles clearly matching existing cards skip Haiku routing entirely
+- Haiku for delta composition — delta updates use Haiku not Sonnet for composition (~25x cheaper)
+- Domain-filtered active cards — when running domain pipeline, only pass that domain's cards to router. Australia with 8 cards: 3,970 tokens vs 5,300 tokens with all 20 cards (25% reduction). AI Tech with 2 cards: 1,800 tokens (66% reduction).
+
+### Cost per operation (verified)
+- New card: ~$0.056 (1 Haiku routing + 1 Sonnet extraction + 1 Sonnet composition)
+- Delta update: ~$0.008 (1 Haiku routing + 1 Sonnet extraction + 1 Haiku composition)
+- Noise rejection: ~$0.004 (1 Haiku routing only)
+
+### Daily cost targets
+- Per domain maintenance run (mostly updates): $0.05-0.16
+- Per domain discovery run (new cards): $0.10-0.30
+- All Domains run: $0.40-0.60
+
+### What to build first next time for cost efficiency
+1. Domain-specific pipeline from day one
+2. Keyword pre-matching before any LLM calls
+3. Haiku for all routing AND delta composition
+4. Cap active cards low (10-15 max) — auto-archive aggressively
+5. Never pass full article body to extraction — cap at 2000 chars
+
+---
+
+## 13. Diagnostic Approach
+
+### Always diagnose before running pipeline
+- Run read-only gate simulation first (no DB writes)
+- Check noise log by gate: gate_1 (URL dedup), gate_2 (SimHash), gate_3 (keyword), gate_4 (freshness), llm_route (Haiku noise)
+- Use run_id to filter noise log per specific run
+- Check COST DEBUG prints temporarily to verify token counts per call
+- Never guess — always measure first
+
+### Key diagnostic queries
+- Noise log last N hours: get_noise_log_since(hours=N)
+- Noise log by run: get_noise_log_by_run_id(run_id)
+- Active cards by domain: get_active_cards() + Counter by domain
+- Delta events last N hours: supabase delta_events table filtered by created_at
+- Token counts: add [COST DEBUG] prints temporarily to engine.py
+
+---
+
 ## 11. Git History Reference
 
 Key commits in order:

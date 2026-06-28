@@ -21,12 +21,15 @@ Instead of scrolling through headlines, Anchor & Delta builds **living story car
 ## Features
 
 - 5 domain tabs — World, Finance, AI & Tech, Australia, India
-- Domain-specific pipeline buttons — run only the domains you need
+- 6 pipeline buttons — World, Finance, AI Tech, Australia, India, All Domains — run only the domains you need
 - Gemini research button — type any topic, get a full intelligence card with current web data
+- Source tagging — pipeline cards vs Gemini research cards shown with different badges (🔴 NEW vs 🔍 RESEARCH)
 - Auto-archiving — cards with no updates for 7 days move to archive automatically
-- Per-card delete and manual archive
+- Per-card archive and delete buttons
 - Body enrichment — fetches full article text, not just RSS teasers
-- Cost guard — never exceeds $0.50 per domain run, $0.60 for all domains
+- Cost guard — never exceeds $0.50 per domain run, $0.80 for all domains
+- Mobile-friendly layout — no sidebar, all controls inline
+- run_id tracking — every pipeline run gets a short ID shown in the stats caption, noise log entries tagged per run
 
 ## Setup
 
@@ -44,10 +47,11 @@ Instead of scrolling through headlines, Anchor & Delta builds **living story car
 
 ## Daily Use
 
-- Click a domain button to run that domain's pipeline (~$0.10-0.20 per domain)
-- Click **🚀 All Domains** for a full briefing run (~$0.50-0.60)
-- Use the **🔍 Research** button to investigate any topic with Gemini
+- Click a domain button to run that domain's pipeline (~$0.05-0.16 maintenance, ~$0.10-0.30 discovery)
+- Click **🚀 All Domains** for a full briefing run (~$0.40-0.60)
+- Use the **🔍 Research** button to investigate any topic with Gemini — creates a research-tagged card
 - Cards auto-archive after 7 days of inactivity
+- Each run shows a Run #ID in the stats caption for noise log tracing
 
 ## Project Structure
 Anchor-Delta/
