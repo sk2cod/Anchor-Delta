@@ -116,18 +116,22 @@ def _format_card_header(card, last_updated_at=None):
     now_sydney = datetime.now(ZoneInfo("Australia/Sydney"))
     hours_ago = (now_sydney - last_updated).total_seconds() / 3600
 
+    is_research = card.get("source", "pipeline") == "research"
+    badge_new = "🔍 RESEARCH" if is_research else "🔴 NEW"
+    badge_old = "🔍 RESEARCH" if is_research else "📌"
+
     if hours_ago < 3:
         hours_int = max(1, round(hours_ago))
         timestamp = f"updated {hours_int} hour{'s' if hours_int != 1 else ''} ago"
-        return f"🔴 NEW · {card['umbrella_title']} — {timestamp}"
+        return f"{badge_new} · {card['umbrella_title']} — {timestamp}"
     elif hours_ago < 24:
         time_str = last_updated.strftime("%I:%M %p").lstrip("0")
         timestamp = f"updated today at {time_str}"
-        return f"🔴 NEW · {card['umbrella_title']} — {timestamp}"
+        return f"{badge_new} · {card['umbrella_title']} — {timestamp}"
     else:
         days_ago = max(1, int(hours_ago // 24))
         timestamp = f"updated {days_ago} day{'s' if days_ago != 1 else ''} ago"
-        return f"📌 {card['umbrella_title']} — {timestamp}"
+        return f"{badge_old} · {card['umbrella_title']} — {timestamp}"
 
 
 def _format_run_timestamp(ts):
@@ -467,7 +471,8 @@ if research_clicked and user_query:
             card_result = create_card(
                 domain=domain,
                 umbrella_title=umbrella_title or user_query,
-                anchor_text=anchor_text
+                anchor_text=anchor_text,
+                source='research',
             )
             card_id = card_result['id'] if isinstance(card_result, dict) else card_result
 

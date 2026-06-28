@@ -6,7 +6,7 @@ from db.client import supabase_client
 logger = logging.getLogger(__name__)
 
 
-def create_card(domain, umbrella_title, anchor_text):
+def create_card(domain, umbrella_title, anchor_text, source='pipeline'):
     response = (
         supabase_client.table("cards")
         .insert(
@@ -14,6 +14,7 @@ def create_card(domain, umbrella_title, anchor_text):
                 "domain": domain,
                 "umbrella_title": umbrella_title,
                 "anchor_text": anchor_text,
+                "source": source,
             }
         )
         .execute()
