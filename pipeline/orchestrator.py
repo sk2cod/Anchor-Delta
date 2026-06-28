@@ -22,10 +22,43 @@ from pipeline.engine import (
 logger = logging.getLogger(__name__)
 
 
+def _find_keyword_match(article: dict, active_cards: list) -> str | None:
+    """
+    Quick keyword match between article and existing card titles.
+    Returns card_id if strong match found, None otherwise.
+    """
+    article_text = (article.get("title", "") + " " + article.get("content", "")[:500]).lower()
+
+    for card in active_cards:
+        title_words = set(
+            w for w in card["umbrella_title"].lower().split()
+            if len(w) > 4 and w not in {"about", "after", "their", "these", "those", "which", "where", "there"}
+        )
+        if len(title_words) == 0:
+            continue
+        matches = sum(1 for w in title_words if w in article_text)
+        match_ratio = matches / len(title_words)
+        if match_ratio >= 0.4 and matches >= 2:
+            return card["id"]
+
+    return None
+
+
 def process_article(article):
     try:
         active_cards = get_active_cards()
-        route_result = route_article(article, active_cards)
+
+        # Try keyword match first to skip Haiku routing
+        keyword_match_id = _find_keyword_match(article, active_cards)
+        if keyword_match_id:
+            class _FakeRoute:
+                classification = "existing_card"
+                card_id = keyword_match_id
+                confidence = "high"
+                reason = "keyword match"
+            route_result = _FakeRoute()
+        else:
+            route_result = route_article(article, active_cards)
 
         if route_result.classification == "noise":
             log_noise(

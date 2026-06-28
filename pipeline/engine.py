@@ -21,6 +21,7 @@ logger = logging.getLogger(__name__)
 client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
 
 ROUTE_MODEL = "claude-haiku-4-5-20251001"
+DELTA_MODEL = "claude-haiku-4-5-20251001"
 EXTRACT_MODEL = "claude-sonnet-4-6"
 COMPOSE_MODEL = "claude-sonnet-4-6"
 
@@ -522,12 +523,12 @@ def compose_delta_update(article, extraction, existing_card, delta_history):
         },
     })
     response, result = _call_structured(
-        COMPOSE_MODEL, COMPOSE_DELTA_UPDATE_SYSTEM_PROMPT, user_content, DeltaUpdateResult
+        DELTA_MODEL, COMPOSE_DELTA_UPDATE_SYSTEM_PROMPT, user_content, DeltaUpdateResult
     )
 
-    RUN_STATS["sonnet_calls"] += 1
-    RUN_STATS["sonnet_input_tokens"] += response.usage.input_tokens
-    RUN_STATS["sonnet_output_tokens"] += response.usage.output_tokens
+    RUN_STATS["haiku_calls"] += 1
+    RUN_STATS["haiku_input_tokens"] += response.usage.input_tokens
+    RUN_STATS["haiku_output_tokens"] += response.usage.output_tokens
 
     return result
 

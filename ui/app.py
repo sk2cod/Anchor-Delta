@@ -540,9 +540,14 @@ if last_run_results:
     timestamp_str = _format_run_timestamp(last_run_at) if last_run_at else "recent"
     cost = run_stats.get("estimated_cost_usd", 0)
     elapsed = format_elapsed(run_stats.get("elapsed_seconds", 0))
+    fetch_stats = last_run_results.get("fetch_stats", {})
+    rss_fetched = fetch_stats.get("rss_fetched", last_run_results.get("fetched", 0))
+    survived_filter = fetch_stats.get("survived_filter", last_run_results.get("survived_filter", 0))
+    reached_llm = fetch_stats.get("reached_llm", len(results))
 
     st.caption(
         f"Last run: {timestamp_str} · "
+        f"Fetched {rss_fetched} · Survived filter {survived_filter} · Processed {reached_llm} · "
         f"{status_counts['created']} created · {status_counts['updated']} updated · "
         f"Est. cost ${cost:.2f} · {elapsed}"
     )

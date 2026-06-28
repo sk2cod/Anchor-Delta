@@ -36,6 +36,14 @@ def run_pipeline(extra_queries: list[str] = None, progress_callback=None, domain
 
     combined = rss_articles + fixed_articles + dynamic_articles
 
+    fetch_stats = {
+        "rss_fetched": len(rss_articles),
+        "dynamic_fetched": len(dynamic_articles),
+        "total_fetched": len(combined),
+        "survived_filter": 0,
+        "reached_llm": 0,
+    }
+
     seen_urls = set()
     deduped = []
     for article in combined:
@@ -45,10 +53,13 @@ def run_pipeline(extra_queries: list[str] = None, progress_callback=None, domain
         deduped.append(article)
 
     survivors = run_filter_pipeline(deduped, fetcher=fetcher)
+    fetch_stats["survived_filter"] = len(survivors)
 
     results = []
+    total_processed = 0
     for article in survivors:
         results.append(process_article(article))
+        total_processed += 1
 
         if progress_callback is not None:
             progress_callback(results)
@@ -62,10 +73,13 @@ def run_pipeline(extra_queries: list[str] = None, progress_callback=None, domain
             )
             break
 
+    fetch_stats["reached_llm"] = total_processed
+
     return {
         "fetched": len(combined),
         "survived_filter": len(survivors),
         "results": results,
         "run_stats": get_run_stats(),
         "archived": archived,
+        "fetch_stats": fetch_stats,
     }
