@@ -44,12 +44,13 @@ def _find_keyword_match(article: dict, active_cards: list) -> str | None:
     return None
 
 
-def process_article(article, run_id=None):
+def process_article(article, run_id=None, domain=None):
     try:
         active_cards = get_active_cards()
+        routing_cards = [c for c in active_cards if c["domain"] == domain] if domain else active_cards
 
         # Try keyword match first to skip Haiku routing
-        keyword_match_id = _find_keyword_match(article, active_cards)
+        keyword_match_id = _find_keyword_match(article, routing_cards)
         if keyword_match_id:
             class _FakeRoute:
                 classification = "existing_card"
@@ -58,7 +59,7 @@ def process_article(article, run_id=None):
                 reason = "keyword match"
             route_result = _FakeRoute()
         else:
-            route_result = route_article(article, active_cards)
+            route_result = route_article(article, routing_cards)
 
         if route_result.classification == "noise":
             log_noise(

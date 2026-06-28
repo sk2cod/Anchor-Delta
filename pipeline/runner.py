@@ -60,7 +60,7 @@ def run_pipeline(extra_queries: list[str] = None, progress_callback=None, domain
     results = []
     total_processed = 0
     for article in survivors:
-        results.append(process_article(article, run_id=run_id))
+        results.append(process_article(article, run_id=run_id, domain=domain))
         total_processed += 1
 
         if progress_callback is not None:
