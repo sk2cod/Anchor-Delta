@@ -617,8 +617,10 @@ if last_run_results:
     survived_filter = fetch_stats.get("survived_filter", last_run_results.get("survived_filter", 0))
     reached_llm = fetch_stats.get("reached_llm", len(results))
 
+    run_id = last_run_results.get("run_id", "")
+    run_id_part = f" · Run #{run_id}" if run_id else ""
     st.caption(
-        f"Last run: {timestamp_str} · "
+        f"Last run: {timestamp_str}{run_id_part} · "
         f"Fetched {rss_fetched} · Survived filter {survived_filter} · Processed {reached_llm} · {elapsed}"
     )
     st.caption(
