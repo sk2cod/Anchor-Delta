@@ -4,3 +4,10 @@ __pycache__/
 *.pyc
 .streamlit/secrets.toml
 *.txt
+
+# Carousel Engine render output
+outputs/renders/*
+outputs/bundles/*
+outputs/**/*.png
+!outputs/renders/.gitkeep
+!outputs/bundles/.gitkeep

@@ -10,6 +10,10 @@ Instead of scrolling through headlines, Anchor & Delta builds **living story car
 - **Live Status Tracker** — dated delta events, most recent first. Each new development appends to the same card.
 - **Conceptual Transmission** — the causal chain explaining why this story matters and where it leads.
 
+## Carousel Engine (in development)
+
+Converts finalised Story Cards into publish-ready Instagram carousels — eight slide PNGs plus caption, pinned comment, and hashtags per card. Currently in Phase 1 scaffolding, ahead of template-design week. See [CAROUSEL_BLUEPRINT_v1.md](CAROUSEL_BLUEPRINT_v1.md) for the architecture and [CAROUSEL_DECISIONS.md](CAROUSEL_DECISIONS.md) for the decisions log.
+
 ## Tech Stack
 
 - **Pipeline**: Python 3.11, Anthropic API (Haiku + Sonnet), Tavily, RSS feeds
@@ -72,11 +76,29 @@ Anchor-Delta/
 
 │   └── runner.py          # Pipeline runner with cost guard
 
+├── carousel/              # Instagram Carousel Engine (scaffolded, empty)
+
+│   ├── prompts/           # (scaffolded, empty)
+
+│   ├── templates/         # (scaffolded, empty)
+
+│   ├── fonts/             # (scaffolded, empty)
+
+│   └── assets/            # (scaffolded, empty)
+
+├── outputs/               # Render output and export bundles (scaffolded, empty)
+
+│   ├── renders/           # (scaffolded, empty)
+
+│   └── bundles/           # (scaffolded, empty)
+
 ├── db/                    # Supabase database layer
 
 ├── ui/app.py              # Streamlit dashboard
 
 ├── tests/                 # Diagnostic scripts
+
+│   └── carousel/          # (scaffolded, empty)
 
 └── DESIGN_LESSONS.md      # Lessons learned and gotchas
 
