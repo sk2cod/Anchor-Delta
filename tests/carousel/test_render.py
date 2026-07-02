@@ -12,7 +12,6 @@ from pathlib import Path
 # --- Paths (all relative to repo root) ---
 REPO_ROOT = Path(__file__).parent.parent.parent
 TEMPLATE_DIR = REPO_ROOT / "carousel" / "templates"
-TEMPLATE_FILE = TEMPLATE_DIR / "statement.html"
 OUTPUT_DIR = REPO_ROOT / "outputs" / "renders"
 OUTPUT_FILE = OUTPUT_DIR / "test_statement.png"
 
@@ -22,16 +21,12 @@ FINAL_WIDTH = 1080
 FINAL_HEIGHT = 1350
 
 TEST_CONTENT = {
+    "template": "hook.html",
     "domain_label": "WORLD",
     "accent_colour": "#C8813A",
-    "headline": "This isn't a territorial war anymore.",
-    "body_html": (
-        'Ukraine figured out something '
-        '<em class="accent">dangerous</em>'
-        ' — Russia\'s refineries fund the entire war machine. '
-        'Strike the supply chain, and the tanks stop moving.'
-    ),
-    "page_indicator": "4 / 8",
+    "headline": "Putin doesn't admit problems.",
+    "emphasis_line": "Today, he did.",
+    "page_indicator": "1 / 8",
     "wordmark": "ANCHOR & DELTA",
 }
 
@@ -57,9 +52,11 @@ def check_dependencies():
         sys.exit(1)
 
 
-def render_template(variables: dict) -> str:
-    html = TEMPLATE_FILE.read_text(encoding="utf-8")
+def render_template(template_file: Path, variables: dict) -> str:
+    html = template_file.read_text(encoding="utf-8")
     for key, value in variables.items():
+        if key == "template":
+            continue
         html = html.replace("{{ " + key + " }}", str(value))
     return html
 
@@ -70,13 +67,14 @@ def main():
     from playwright.sync_api import sync_playwright
     from PIL import Image
 
-    if not TEMPLATE_FILE.exists():
-        print(f"Template not found: {TEMPLATE_FILE}")
+    template_file = TEMPLATE_DIR / TEST_CONTENT.get("template", "statement.html")
+    if not template_file.exists():
+        print(f"Template not found: {template_file}")
         sys.exit(1)
 
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
-    rendered_html = render_template(TEST_CONTENT)
+    rendered_html = render_template(template_file, TEST_CONTENT)
     tmp_html_path = TEMPLATE_DIR / "_tmp_render.html"
     tmp_html_path.write_text(rendered_html, encoding="utf-8")
 
