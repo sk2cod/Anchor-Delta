@@ -59,11 +59,25 @@ TEST_CONTENT_NUMBER = {
     "wordmark": "ANCHOR & DELTA",
 }
 
+TEST_CONTENT_QUOTE = {
+    "template": "quote.html",
+    "domain_label": "WORLD",
+    "accent_colour": "#C8813A",
+    "attribution": "Volodymyr Zelensky, President of Ukraine",
+    "quote_text": (
+        "Russia thought this was about land. "
+        "We showed them it was about survival."
+    ),
+    "page_indicator": "5 / 8",
+    "wordmark": "ANCHOR & DELTA",
+}
+
 # Each job renders one TEST_CONTENT dict to its own output file.
 RENDER_JOBS = [
     (TEST_CONTENT_STATEMENT, OUTPUT_DIR / "test_statement.png"),
     (TEST_CONTENT_HOOK, OUTPUT_DIR / "test_hook.png"),
     (TEST_CONTENT_NUMBER, OUTPUT_DIR / "test_number.png"),
+    (TEST_CONTENT_QUOTE, OUTPUT_DIR / "test_quote.png"),
 ]
 
 
