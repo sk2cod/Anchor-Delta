@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=1080">
+  <link rel="stylesheet" href="base.css">
+  <style>
+    /* accent override — set by caller per domain */
+    .slide { --accent: {{ accent_colour }}; }
+
+    .cta-content {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      gap: 16px;
+    }
+
+    .cta-line-1 {
+      font-family: var(--font-display);
+      font-weight: 900;
+      font-size: 120px;
+      line-height: 1.05;
+      color: var(--text-primary);
+      letter-spacing: -1px;
+    }
+
+    .cta-line-2 {
+      font-family: var(--font-body);
+      font-weight: 400;
+      font-size: 64px;
+      line-height: 1.4;
+      color: var(--text-muted);
+      letter-spacing: 1px;
+    }
+
+    .cta-footer {
+      text-align: center;
+      font-family: var(--font-body);
+      font-weight: 500;
+      font-size: 28px;
+      letter-spacing: 2px;
+      color: var(--text-footer);
+      text-transform: uppercase;
+      padding-bottom: var(--pad-y);
+    }
+  </style>
+</head>
+<body>
+<div class="slide">
+  <div class="cta-content">
+    <p class="cta-line-1">Follow {{ handle }}</p>
+    <p class="cta-line-2">for daily intelligence</p>
+  </div>
+
+  <div class="cta-footer">{{ wordmark }}</div>
+</div>
+</body>
+</html>

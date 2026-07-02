@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=1080">
+  <link rel="stylesheet" href="base.css">
+  <style>
+    /* accent override — set by caller per domain */
+    .slide { --accent: {{ accent_colour }}; }
+
+    .content {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding: 80px 0;
+    }
+
+    .date-label {
+      font-family: var(--font-body);
+      font-weight: 500;
+      font-size: 36px;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: var(--text-footer);
+      margin-bottom: 48px;
+    }
+
+    .headline {
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: 130px;
+      line-height: 1.1;
+      color: var(--text-primary);
+      letter-spacing: -1px;
+    }
+
+    .body-text {
+      font-family: var(--font-body);
+      font-weight: 400;
+      font-size: 56px;
+      line-height: 1.65;
+      color: var(--text-muted);
+    }
+
+    .body-text .accent {
+      color: var(--accent);
+      font-style: italic;
+      font-weight: 400;
+    }
+  </style>
+</head>
+<body>
+<div class="slide">
+  <div class="domain-tag">{{ domain_label }}</div>
+
+  <div class="content">
+    <div class="date-label">{{ date_label }}</div>
+    <h1 class="headline">{{ headline }}</h1>
+    <div class="rule"></div>
+    <p class="body-text">{{ body_html }}</p>
+  </div>
+
+  <footer class="footer">
+    <span class="page-indicator">{{ page_indicator }}</span>
+    <span class="wordmark">{{ wordmark }}</span>
+  </footer>
+</div>
+</body>
+</html>

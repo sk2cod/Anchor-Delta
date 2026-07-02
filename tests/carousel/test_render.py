@@ -72,12 +72,52 @@ TEST_CONTENT_QUOTE = {
     "wordmark": "ANCHOR & DELTA",
 }
 
+TEST_CONTENT_TIMELINE = {
+    "template": "timeline.html",
+    "domain_label": "WORLD",
+    "accent_colour": "#C8813A",
+    "date_label": "JUNE 29, 2026",
+    "headline": "Ukraine struck the Kremlin's supply chain.",
+    "body_html": (
+        'Two refineries hit in a single night — '
+        '<em class="accent">800 miles</em> from the front line.'
+    ),
+    "page_indicator": "2 / 8",
+    "wordmark": "ANCHOR & DELTA",
+}
+
+TEST_CONTENT_CONCEPT = {
+    "template": "concept.html",
+    "domain_label": "WORLD",
+    "accent_colour": "#C8813A",
+    "headline": "Why refineries, not tanks.",
+    "body_html": (
+        'Tanks need fuel. Fuel needs refineries. '
+        'Refineries are fixed, large, and visible. '
+        'Ukraine found the '
+        '<em class="accent">single point of failure</em> '
+        'in Russia\'s entire war machine.'
+    ),
+    "page_indicator": "6 / 8",
+    "wordmark": "ANCHOR & DELTA",
+}
+
+TEST_CONTENT_CTA = {
+    "template": "cta.html",
+    "accent_colour": "#C8813A",
+    "handle": "@anchordelta",
+    "wordmark": "ANCHOR & DELTA",
+}
+
 # Each job renders one TEST_CONTENT dict to its own output file.
 RENDER_JOBS = [
     (TEST_CONTENT_STATEMENT, OUTPUT_DIR / "test_statement.png"),
     (TEST_CONTENT_HOOK, OUTPUT_DIR / "test_hook.png"),
     (TEST_CONTENT_NUMBER, OUTPUT_DIR / "test_number.png"),
     (TEST_CONTENT_QUOTE, OUTPUT_DIR / "test_quote.png"),
+    (TEST_CONTENT_TIMELINE, OUTPUT_DIR / "test_timeline.png"),
+    (TEST_CONTENT_CONCEPT, OUTPUT_DIR / "test_concept.png"),
+    (TEST_CONTENT_CTA, OUTPUT_DIR / "test_cta.png"),
 ]
 
 
