@@ -511,6 +511,39 @@ rejected.
 
 ---
 
+## #47 — StoryCard defined in carousel/models.py, not imported from pipeline
+
+**Date:** 2026-06-30
+**Decision:** StoryCard is defined independently in carousel/models.py,
+sourced from db/schema.sql and the db layer files — not imported from
+pipeline/models.py.
+**Why:** pipeline/models.py contains LLM DTOs only, not a persisted-card
+contract. The db layer is the correct source of truth for the carousel
+engine's StoryCard definition. Importing from pipeline would create a
+coupling to the wrong abstraction.
+**Alternatives considered:** Option A (import from pipeline/models.py)
+— rejected because pipeline/models.py has no persisted-card contract.
+**Supersedes:** The Option A recommendation made earlier this session.
+**Status:** Active
+
+---
+
+## #48 — DeltaEvent.dialogue as list[dict], not list[DialogueTurn]
+
+**Date:** 2026-06-30
+**Decision:** DeltaEvent.dialogue is typed as list[dict] in
+carousel/models.py, not list[DialogueTurn].
+**Why:** DialogueTurn is an unrelated pipeline DTO. Importing it would
+violate Decision #41's boundary discipline — carousel imports from
+pipeline only for genuine shared contracts, not convenience. JSONB
+passthrough is correct for a field the carousel only reads.
+**Alternatives considered:** Redefine DialogueTurn in carousel/models.py
+(3 lines). Rejected — adds a type that carousel never validates or
+generates. Unnecessary complexity.
+**Status:** Active
+
+---
+
 ## Open questions to revisit
 
 - **Anonymous handle name.** Pending account creation.
@@ -527,6 +560,9 @@ rejected.
 - 2026-06-30: Log seeded with decisions #01–#40 from 8 design exchanges. Blueprint v1.0 written. Template-design week begins next.
 - 2026-06-30: Decision #41 added — repository structure and boundary discipline. Blueprint updated with new section 18 (Repository layout) covering directory structure, boundary rules, pre-implementation scaffolding, branch strategy, and Claude Code context requirements.
 - 2026-06-30: Decisions #42–#45 added — visual system locked after mockup validation and user approval. Background warm dark brown `#1A1612`, headline font Playfair Display 700/900 (final, not subject to template-week revision), World accent changed to amber gold `#C8813A` (supersedes #25 World portion), thin rule line as structural design element. Blueprint Section 11 fully rewritten to reflect these locks.
+- 2026-06-30: Decisions #47–#48 added — deviations from Blueprint §6
+  recorded. StoryCard defined from db schema, not pipeline. dialogue
+  field typed as list[dict] per boundary discipline.
 - 2026-06-30: Decision #46 added — Phase 1 template design includes a
   minimal Playwright render script as a design feedback tool. Supersedes
   #37 in letter only. Constraint recorded: the script must not import from
