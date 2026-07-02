@@ -80,14 +80,14 @@ html, body {
 }
 
 .slide {
+  position: relative;
+  width: var(--canvas-width);
+  height: var(--canvas-height);
+  overflow: hidden;
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
-  width: 2160px;
-  height: 2700px;
-  padding: 120px 144px;
-  box-sizing: border-box;
-  background-color: #1A1612;
+  padding: var(--pad-y) var(--pad-x);
+  padding-top: 160px;
 }
 
 .slide::before {
@@ -114,7 +114,8 @@ html, body {
 .footer {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-end;
+  margin-top: auto;
 }
 
 .page-indicator,

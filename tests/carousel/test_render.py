@@ -13,14 +13,28 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).parent.parent.parent
 TEMPLATE_DIR = REPO_ROOT / "carousel" / "templates"
 OUTPUT_DIR = REPO_ROOT / "outputs" / "renders"
-OUTPUT_FILE = OUTPUT_DIR / "test_statement.png"
 
 RENDER_WIDTH = 2160
 RENDER_HEIGHT = 2700
 FINAL_WIDTH = 1080
 FINAL_HEIGHT = 1350
 
-TEST_CONTENT = {
+TEST_CONTENT_STATEMENT = {
+    "template": "statement.html",
+    "domain_label": "WORLD",
+    "accent_colour": "#C8813A",
+    "headline": "This isn't a territorial war anymore.",
+    "body_html": (
+        'Ukraine figured out something '
+        '<em class="accent">dangerous</em>'
+        ' — Russia\'s refineries fund the entire war machine. '
+        'Strike the supply chain, and the tanks stop moving.'
+    ),
+    "page_indicator": "4 / 8",
+    "wordmark": "ANCHOR & DELTA",
+}
+
+TEST_CONTENT_HOOK = {
     "template": "hook.html",
     "domain_label": "WORLD",
     "accent_colour": "#C8813A",
@@ -29,6 +43,28 @@ TEST_CONTENT = {
     "page_indicator": "1 / 8",
     "wordmark": "ANCHOR & DELTA",
 }
+
+TEST_CONTENT_NUMBER = {
+    "template": "number.html",
+    "domain_label": "WORLD",
+    "accent_colour": "#C8813A",
+    "date_label": "JUNE 29, 2026",
+    "headline": "Ukraine struck two more refineries.",
+    "number_row_1_label": "Krasnodar",
+    "number_row_1_value": "186 mi",
+    "number_row_2_label": "Yaroslavl",
+    "number_row_2_value": "435 mi",
+    "context_label": "from the front line",
+    "page_indicator": "3 / 8",
+    "wordmark": "ANCHOR & DELTA",
+}
+
+# Each job renders one TEST_CONTENT dict to its own output file.
+RENDER_JOBS = [
+    (TEST_CONTENT_STATEMENT, OUTPUT_DIR / "test_statement.png"),
+    (TEST_CONTENT_HOOK, OUTPUT_DIR / "test_hook.png"),
+    (TEST_CONTENT_NUMBER, OUTPUT_DIR / "test_number.png"),
+]
 
 
 def check_dependencies():
@@ -61,42 +97,48 @@ def render_template(template_file: Path, variables: dict) -> str:
     return html
 
 
-def main():
-    check_dependencies()
-
-    from playwright.sync_api import sync_playwright
-    from PIL import Image
-
-    template_file = TEMPLATE_DIR / TEST_CONTENT.get("template", "statement.html")
+def render_one(page, content: dict, output_file: Path):
+    template_file = TEMPLATE_DIR / content.get("template", "statement.html")
     if not template_file.exists():
         print(f"Template not found: {template_file}")
         sys.exit(1)
 
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-
-    rendered_html = render_template(template_file, TEST_CONTENT)
+    rendered_html = render_template(template_file, content)
     tmp_html_path = TEMPLATE_DIR / "_tmp_render.html"
     tmp_html_path.write_text(rendered_html, encoding="utf-8")
 
     try:
-        with sync_playwright() as p:
-            browser = p.chromium.launch()
-            page = browser.new_page(viewport={"width": RENDER_WIDTH, "height": RENDER_HEIGHT})
-            page.goto(tmp_html_path.as_uri())
-            page.evaluate("document.fonts.ready")
-            page.screenshot(path=str(OUTPUT_DIR / "_tmp_full_res.png"))
-            browser.close()
+        page.goto(tmp_html_path.as_uri())
+        page.evaluate("document.fonts.ready")
+        full_res_path = OUTPUT_DIR / "_tmp_full_res.png"
+        page.screenshot(path=str(full_res_path))
     finally:
         tmp_html_path.unlink(missing_ok=True)
 
-    full_res_path = OUTPUT_DIR / "_tmp_full_res.png"
+    from PIL import Image
+
     with Image.open(full_res_path) as img:
         downscaled = img.resize((FINAL_WIDTH, FINAL_HEIGHT), Image.LANCZOS)
-        downscaled.save(OUTPUT_FILE)
+        downscaled.save(output_file)
     full_res_path.unlink(missing_ok=True)
 
-    size_kb = OUTPUT_FILE.stat().st_size / 1024
-    print(f"Rendered: {OUTPUT_FILE} ({size_kb:.1f} KB)")
+    size_kb = output_file.stat().st_size / 1024
+    print(f"Rendered: {output_file} ({size_kb:.1f} KB)")
+
+
+def main():
+    check_dependencies()
+
+    from playwright.sync_api import sync_playwright
+
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        page = browser.new_page(viewport={"width": RENDER_WIDTH, "height": RENDER_HEIGHT})
+        for content, output_file in RENDER_JOBS:
+            render_one(page, content, output_file)
+        browser.close()
 
 
 if __name__ == "__main__":

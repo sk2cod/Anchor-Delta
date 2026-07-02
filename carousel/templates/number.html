@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=1080">
+  <link rel="stylesheet" href="base.css">
+  <style>
+    /* accent override — set by caller per domain */
+    .slide { --accent: {{ accent_colour }}; }
+
+    .content {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding: 80px 0;
+    }
+
+    .date-label {
+      font-family: var(--font-body);
+      font-weight: 500;
+      font-size: 36px;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: var(--text-footer);
+      margin-bottom: 48px;
+    }
+
+    .headline {
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: 120px;
+      line-height: 1.15;
+      color: var(--text-primary);
+      letter-spacing: -1px;
+      margin-bottom: 64px;
+    }
+
+    .number-rows {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+    }
+
+    .number-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      padding: 48px 0;
+    }
+
+    .number-divider {
+      width: 100%;
+      height: 2px;                /* 1px at 1x, doubled for 2x render */
+      background: var(--accent);
+      opacity: 0.15;
+    }
+
+    .number-label {
+      font-family: var(--font-body);
+      font-weight: 400;
+      font-size: 40px;
+      color: var(--text-muted);
+    }
+
+    .dominant-number {
+      font-family: var(--font-display);
+      font-weight: 900;
+      font-size: 72px;
+      color: var(--accent);
+      line-height: 1;
+    }
+
+    .context-label {
+      font-family: var(--font-body);
+      font-weight: 400;
+      font-size: 36px;
+      color: #5A5248;
+      margin-top: 40px;
+      line-height: 1.5;
+    }
+  </style>
+</head>
+<body>
+<div class="slide">
+  <div class="domain-tag">{{ domain_label }}</div>
+
+  <div class="content">
+    <div class="date-label">{{ date_label }}</div>
+    <h1 class="headline">{{ headline }}</h1>
+
+    <div class="number-rows">
+      <div class="number-row">
+        <span class="number-label">{{ number_row_1_label }}</span>
+        <span class="dominant-number">{{ number_row_1_value }}</span>
+      </div>
+      <div class="number-divider"></div>
+      <div class="number-row">
+        <span class="number-label">{{ number_row_2_label }}</span>
+        <span class="dominant-number">{{ number_row_2_value }}</span>
+      </div>
+    </div>
+
+    <p class="context-label">{{ context_label }}</p>
+  </div>
+
+  <footer class="footer">
+    <span class="page-indicator">{{ page_indicator }}</span>
+    <span class="wordmark">{{ wordmark }}</span>
+  </footer>
+</div>
+</body>
+</html>
