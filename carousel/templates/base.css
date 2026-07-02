@@ -1,0 +1,141 @@
+:root {
+  /* Canvas — authored at 2x render resolution (2160x2700), downscaled to
+     1080x1350 for final output, matching every other size token in this
+     file (all already doubled from their 1x blueprint values). */
+  --canvas-width: 2160px;
+  --canvas-height: 2700px;
+
+  /* Background */
+  --bg-primary: #1A1612;
+  --bg-gradient: radial-gradient(
+    ellipse at 30% 20%,
+    rgba(200, 129, 58, 0.07) 0%,
+    transparent 60%
+  );
+
+  /* Typography */
+  --font-display: 'Playfair Display', Georgia, serif;
+  --font-body: 'Inter', system-ui, sans-serif;
+
+  /* Text colours */
+  --text-primary: #E8E0D0;
+  --text-muted: #8A8078;
+  --text-footer: #4A4540;
+
+  /* Accent — overridden per domain in template */
+  --accent: #C8813A;
+
+  /* Rule line */
+  --rule-opacity: 0.20;
+
+  /* Spacing */
+  --pad-x: 72px;
+  --pad-y: 80px;
+  --gap-sm: 16px;
+  --gap-md: 32px;
+  --gap-lg: 48px;
+}
+
+/* Playfair Display — weights 700 and 900 only (Decision #43) */
+@font-face {
+  font-family: 'Playfair Display';
+  font-style: normal;
+  font-weight: 700;
+  font-display: block;
+  src: url('../fonts/PlayfairDisplay-Bold.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Playfair Display';
+  font-style: normal;
+  font-weight: 900;
+  font-display: block;
+  src: url('../fonts/PlayfairDisplay-Black.woff2') format('woff2');
+}
+
+/* Inter — weights 400 and 500 only (Decision #10, #43) */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 400;
+  font-display: block;
+  src: url('../fonts/Inter-Regular.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 500;
+  font-display: block;
+  src: url('../fonts/Inter-Medium.woff2') format('woff2');
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  width: var(--canvas-width);
+  height: var(--canvas-height);
+  overflow: hidden;
+  background: var(--bg-primary);
+}
+
+.slide {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  width: 2160px;
+  height: 2700px;
+  padding: 120px 144px;
+  box-sizing: border-box;
+  background-color: #1A1612;
+}
+
+.slide::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--bg-gradient);
+  pointer-events: none;
+}
+
+.header {
+  /* domain tag sits here — top of slide */
+}
+
+.domain-tag {
+  font-family: var(--font-body);
+  font-weight: 500;
+  font-size: 36px;           /* 18px at 1x, doubled for 2x render */
+  letter-spacing: 4px;       /* 2px at 1x, doubled */
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.page-indicator,
+.wordmark {
+  font-family: var(--font-body);
+  font-weight: 400;
+  font-size: 32px;
+  letter-spacing: 2px;
+  color: var(--text-footer);
+  text-transform: uppercase;
+}
+
+.wordmark {
+  font-weight: 500;
+  letter-spacing: 2px;
+}
+
+.rule {
+  width: 100%;
+  height: 2px;                /* 1px at 1x, doubled for 2x render */
+  background: var(--accent);
+  opacity: 0.20;               /* Decision #45 — barely-there structural divider */
+  margin: var(--gap-md) 0;
+}
