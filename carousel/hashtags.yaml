@@ -1,0 +1,67 @@
+# Anchor & Delta — Curated hashtag pool
+# Real pool to be built before v1.0 ships.
+# Structure: domain-specific tags + cross-domain tags.
+# HashtagBuilder samples 18-22 tags per carousel.
+
+world:
+  - worldnews
+  - geopolitics
+  - internationalnews
+  - globalaffairs
+  - foreignpolicy
+  - conflictnews
+  - diplomacy
+  - warreporting
+  - breakingnews
+  - newsanalysis
+  - currentevents
+  - politicalnews
+  - worldpolitics
+  - crisis
+  - intelligence
+
+finance:
+  - finance
+  - economics
+  - markets
+  - investing
+  - economy
+  - financenews
+  - stockmarket
+  - macroeconomics
+  - tradepolicy
+  - globaleconomy
+  - centralbank
+  - inflation
+  - monetarypolicy
+  - financialmarkets
+  - businessnews
+
+ai_tech:
+  - artificialintelligence
+  - ai
+  - technology
+  - techindustry
+  - machinelearning
+  - airegulation
+  - bigtech
+  - technews
+  - aipolicy
+  - futureoftech
+  - aiethics
+  - deeplearning
+  - ainews
+  - techpolicy
+  - innovation
+
+cross_domain:
+  - anchordelta
+  - dailyintelligence
+  - newsbreak
+  - informationwarfare
+  - analysis
+  - explained
+  - context
+  - intelligence
+  - briefing
+  - deepdive
