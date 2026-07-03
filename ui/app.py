@@ -299,13 +299,18 @@ def render_card(card_data):
 
         st.markdown(_THIN_DIVIDER, unsafe_allow_html=True)
         if not card.get('is_archived', False):
-            col1, col2, col3 = st.columns([5, 1, 1])
+            col1, col2, col3, col4 = st.columns([4, 1, 1, 1])
             with col2:
                 if st.button("📦", key=f"archive_{card['id']}", help="Archive this card"):
                     st.session_state[f"confirm_archive_{card['id']}"] = True
             with col3:
                 if st.button("🗑️", key=f"delete_{card['id']}", help="Delete this card permanently"):
                     st.session_state[f"confirm_delete_{card['id']}"] = True
+            with col4:
+                if card.get('domain') in ('world', 'finance', 'ai_tech'):
+                    carousel_key = f"generate_carousel_{card['id']}"
+                    if st.button("🎠", key=carousel_key, help="Generate Instagram carousel"):
+                        st.session_state[f"carousel_generating_{card['id']}"] = True
 
             if st.session_state.get(f"confirm_archive_{card['id']}", False):
                 st.warning("Move this card to Archive?")
@@ -339,6 +344,51 @@ def render_card(card_data):
                 if st.button("Cancel", key=f"confirm_no_{card['id']}"):
                     st.session_state[f"confirm_delete_{card['id']}"] = False
                     st.rerun()
+
+        if card.get('domain') in ('world', 'finance', 'ai_tech'):
+            if st.session_state.get(f"carousel_generating_{card['id']}"):
+                with st.spinner("Generating carousel..."):
+                    try:
+                        from carousel.loader import load_card
+                        from carousel.context_builder import build_context
+                        from carousel.planner import plan_carousel
+                        from carousel.writer import write_carousel
+                        from carousel.layout_picker import pick_layouts
+                        from carousel.renderer import render_carousel
+                        from carousel.assembler import assemble_carousel
+
+                        story_card = load_card(card['id'])
+                        context = build_context(story_card)
+                        plan = plan_carousel(context)
+                        spec = write_carousel(
+                            context, plan, card_id=card['id']
+                        )
+                        enriched = pick_layouts(spec, domain=context.domain)
+                        paths = render_carousel(enriched)
+                        carousel = assemble_carousel(
+                            enriched, paths,
+                            domain=context.domain,
+                            card_id=card['id'],
+                            persist=True,
+                        )
+                        st.session_state[
+                            f"carousel_{card['id']}"
+                        ] = carousel
+                        st.session_state[
+                            f"carousel_generating_{card['id']}"
+                        ] = False
+                        st.rerun()
+
+                    except Exception as e:
+                        st.error(f"Carousel generation failed: {e}")
+                        st.session_state[
+                            f"carousel_generating_{card['id']}"
+                        ] = False
+
+            if f"carousel_{card['id']}" in st.session_state:
+                from ui.carousel_view import render_carousel_preview
+                carousel = st.session_state[f"carousel_{card['id']}"]
+                render_carousel_preview(carousel)
 
 
 DOMAIN_KEYS = {
