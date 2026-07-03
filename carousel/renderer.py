@@ -12,7 +12,6 @@ Fonts self-hosted, no CDN at render time (Decision #10, #11). Renders at
 phones (Decision #09).
 """
 
-import hashlib
 import io
 import re
 from pathlib import Path
@@ -21,6 +20,7 @@ from typing import Optional
 from jinja2 import Environment, FileSystemLoader, TemplateNotFound
 from PIL import Image
 
+from carousel.cache import render_cache_key
 from carousel.layout_picker import DOMAIN_ACCENTS
 from carousel.models import EnrichedSlide, EnrichedSpec
 
@@ -129,17 +129,14 @@ def _build_variables(enriched_slide: EnrichedSlide, domain_label: str, page_indi
 def _cache_key(enriched_slide: EnrichedSlide) -> str:
     layout = enriched_slide.layout
     slide = enriched_slide.slide
-    raw = "|".join(
-        [
-            layout.template_id.value,
-            slide.headline,
-            slide.body,
-            layout.accent_colour,
-            layout.theme_variant,
-            BRAND_VERSION,
-        ]
+    return render_cache_key(
+        template_id=layout.template_id.value,
+        headline=slide.headline,
+        body=slide.body,
+        accent=layout.accent_colour,
+        theme=layout.theme_variant,
+        brand_version=BRAND_VERSION,
     )
-    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
 
 def _cache_path(cache_key: str) -> Path:

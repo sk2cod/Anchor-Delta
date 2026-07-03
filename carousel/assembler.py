@@ -13,6 +13,7 @@ from pathlib import Path
 
 import yaml
 
+from carousel.cache import record_hashtag_use
 from carousel.models import Carousel, CarouselSpec, CarouselStatus, EnrichedSpec
 from db.carousel_queries import upsert_carousel
 
@@ -46,9 +47,12 @@ def build_hashtags(
     cross_domain tags. Returns list of hashtag strings
     with # prefix.
 
-    TODO(v1.5+): rotation log — track the last 10 carousels' hashtag sets
-    and avoid repeating the exact same set as the previous post
-    (anti-shadowban heuristic per Blueprint §5.7). Not implemented in v1.0.
+    Records the selected set to the rotation log (carousel/cache.py) so
+    future selections can check for repeats.
+
+    TODO(v1.5+): actually use get_recent_hashtags() to avoid repeating the
+    exact same set as the previous post (anti-shadowban heuristic per
+    Blueprint §5.7). Recording is wired up; the avoidance check is not.
     """
     pool = _load_hashtag_pool()
     domain_pool = list(pool.get(domain, []))
@@ -75,7 +79,9 @@ def build_hashtags(
     selected = domain_selection + cross_pool
     random.shuffle(selected)
 
-    return [f"#{tag}" for tag in selected]
+    hashtags = [f"#{tag}" for tag in selected]
+    record_hashtag_use(hashtags)
+    return hashtags
 
 
 def assemble_caption(
