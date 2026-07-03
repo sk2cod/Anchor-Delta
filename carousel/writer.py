@@ -1,0 +1,228 @@
+"""
+CarouselWriter — the single LLM creative call (Blueprint §5.4).
+
+Given StoryContext and SlotPlan, produces all slide text, caption, pinned
+comment, and hashtag themes in one Sonnet call with structured JSON output.
+Voice consistency requires the model to see the full slide arc in one pass
+(Decision #02) — splitting into per-slide calls produces drift and wastes
+tokens re-establishing context.
+
+Uses CAROUSEL_ANTHROPIC_API_KEY, not ANTHROPIC_API_KEY — a separate billing
+account from the Intelligence Engine pipeline (Decision #40).
+"""
+
+import hashlib
+import json
+import os
+import uuid
+from datetime import datetime
+from pathlib import Path
+
+import anthropic
+from dotenv import load_dotenv
+
+from carousel.models import CarouselSpec, GenerationMetadata, Slide, SlotPlan, StoryContext
+
+load_dotenv()
+
+SONNET_MODEL = "claude-sonnet-4-6"
+MAX_TOKENS = 4000
+PROMPT_PATH = Path(__file__).parent / "prompts" / "writer_v1_0.md"
+
+# Sonnet pricing per Blueprint-specified formula (per token, not per 1M).
+INPUT_COST_PER_TOKEN = 0.000003
+OUTPUT_COST_PER_TOKEN = 0.000015
+
+
+class CarouselWriteError(Exception):
+    pass
+
+
+def _load_system_prompt() -> str:
+    if not PROMPT_PATH.exists():
+        raise CarouselWriteError(f"Writer prompt not found at {PROMPT_PATH}")
+    return PROMPT_PATH.read_text(encoding="utf-8")
+
+
+def _strip_json_fences(text: str) -> str:
+    """The writer sometimes wraps JSON in ```json ... ``` despite instructions not to."""
+    text = text.strip()
+    if text.startswith("```"):
+        text = text.split("\n", 1)[1] if "\n" in text else text[3:]
+        if text.rstrip().endswith("```"):
+            text = text.rstrip()[:-3]
+    return text.strip()
+
+
+def _build_user_message(context: StoryContext, slot_plan: SlotPlan) -> str:
+    previous_developments = "\n".join(
+        f"- {d.headline} — {d.tldr}" for d in context.previous_deltas
+    ) or "(none)"
+
+    transmission = "\n".join(f"- {node}" for node in context.transmission_summary.nodes)
+
+    quotes = "\n".join(
+        f'- "{q.text}" — {q.attribution} ({q.role})' for q in context.available_quotes
+    ) or "(none)"
+
+    entities = "\n".join(
+        f"- {e.name} ({e.type}, {e.importance})" for e in context.key_entities
+    ) or "(none)"
+
+    numbers = "\n".join(
+        f"- {n.value} — {n.label}: {n.context}" for n in context.dominant_numbers
+    ) or "(none)"
+
+    slots = "\n".join(f"- {s.slot_id} ({s.role.value})" for s in slot_plan.slots)
+
+    return f"""DOMAIN: {context.domain}
+
+CARD TITLE: {context.umbrella_title}
+
+ANCHOR:
+{context.anchor_text}
+
+LATEST DEVELOPMENT ({context.latest_delta.event_date}):
+{context.latest_delta.headline}
+{context.latest_delta.tldr}
+
+PREVIOUS DEVELOPMENTS:
+{previous_developments}
+
+TRANSMISSION (causal chain):
+{transmission}
+
+AVAILABLE QUOTES:
+{quotes}
+
+KEY ENTITIES:
+{entities}
+
+KEY NUMBERS:
+{numbers}
+
+SLOT PLAN (write exactly these slides in this order):
+{slots}
+
+CARD AGE: {context.card_age_days} days"""
+
+
+def _build_spec_from_response(
+    response_text: str,
+    card_id: str,
+    card_version: str,
+    prompt_version: str,
+    usage,
+) -> CarouselSpec:
+    """Parse + validate a writer response into a CarouselSpec. Raises on any failure."""
+    data = json.loads(_strip_json_fences(response_text))
+
+    slides = []
+    for slide_data in data["slides"]:
+        slide = Slide(**slide_data)
+        slide.text_hash = hashlib.md5(
+            (slide.headline + slide.body).encode("utf-8")
+        ).hexdigest()
+        slides.append(slide)
+
+    cost_usd = (
+        usage.input_tokens * INPUT_COST_PER_TOKEN
+        + usage.output_tokens * OUTPUT_COST_PER_TOKEN
+    )
+
+    generation_metadata = GenerationMetadata(
+        model=SONNET_MODEL,
+        created_at=datetime.utcnow(),
+        input_tokens=usage.input_tokens,
+        output_tokens=usage.output_tokens,
+        cost_usd=cost_usd,
+    )
+
+    return CarouselSpec(
+        script_id=uuid.uuid4(),
+        card_id=card_id,
+        card_version=card_version,
+        prompt_version=prompt_version,
+        slides=slides,
+        caption=data["caption"],
+        pinned_comment=data["pinned_comment"],
+        hashtag_themes=data["hashtag_themes"],
+        generation_metadata=generation_metadata,
+    )
+
+
+def write_carousel(
+    context: StoryContext,
+    slot_plan: SlotPlan,
+    card_id: str,
+    prompt_version: str = "writer-v1.0",
+) -> CarouselSpec:
+    """
+    Single Sonnet call producing all slide text, caption,
+    pinned comment, and hashtag themes.
+    Cost: ~$0.025-0.035. Latency: 4-7 seconds.
+    Uses CAROUSEL_ANTHROPIC_API_KEY.
+    """
+    api_key = os.environ.get("CAROUSEL_ANTHROPIC_API_KEY")
+    if not api_key:
+        raise CarouselWriteError(
+            "CAROUSEL_ANTHROPIC_API_KEY is not set. This is a separate "
+            "billing account from ANTHROPIC_API_KEY (Intelligence Engine "
+            "pipeline) — set it in .env before running CarouselWriter."
+        )
+
+    system_prompt = _load_system_prompt()
+    user_message = _build_user_message(context, slot_plan)
+    card_version = hashlib.md5(
+        (context.anchor_text + context.latest_delta.headline).encode("utf-8")
+    ).hexdigest()
+
+    client = anthropic.Anthropic(api_key=api_key)
+
+    try:
+        message = client.messages.create(
+            model=SONNET_MODEL,
+            max_tokens=MAX_TOKENS,
+            system=system_prompt,
+            messages=[{"role": "user", "content": user_message}],
+        )
+    except Exception as e:
+        raise CarouselWriteError("Sonnet writer call failed") from e
+
+    response_text = message.content[0].text
+
+    try:
+        return _build_spec_from_response(
+            response_text, card_id, card_version, prompt_version, message.usage
+        )
+    except Exception as first_error:
+        # One automatic retry, with the validation error appended to the prompt.
+        retry_message = (
+            user_message
+            + "\n\nYour previous response failed validation with this error:\n"
+            + f"{first_error}\n\n"
+            + "Return corrected JSON only, matching the required structure exactly."
+        )
+        try:
+            retry_response = client.messages.create(
+                model=SONNET_MODEL,
+                max_tokens=MAX_TOKENS,
+                system=system_prompt,
+                messages=[{"role": "user", "content": retry_message}],
+            )
+        except Exception as e:
+            raise CarouselWriteError("Sonnet writer retry call failed") from e
+
+        try:
+            return _build_spec_from_response(
+                retry_response.content[0].text,
+                card_id,
+                card_version,
+                prompt_version,
+                retry_response.usage,
+            )
+        except Exception as second_error:
+            raise CarouselWriteError(
+                f"Writer output failed validation twice. First error: {first_error}. "
+                f"Second error: {second_error}."
+            ) from second_error
