@@ -6,14 +6,17 @@ render_card() in ui/app.py after carousel generation. ui/ may import from
 carousel/; carousel/ never imports from ui/ (Decision #41).
 """
 
+import hashlib
 from pathlib import Path
 
 import streamlit as st
 
 from carousel.assembler import AssemblerError, build_hashtags, export_carousel
+from carousel.layout_picker import pick_layouts
 from carousel.models import Carousel, CarouselStatus
+from carousel.renderer import render_slide
 from db.cards import get_card_by_id
-from db.carousel_queries import update_carousel_status
+from db.carousel_queries import update_carousel_status, upsert_carousel
 
 EXPORT_OUTPUT_DIR = Path("outputs") / "bundles"
 
@@ -101,11 +104,64 @@ def _render_slide_controls(carousel: Carousel, index: int, slide) -> None:
             st.rerun()
 
     if st.session_state.get(edit_key, False):
-        # Inline text editor (Model C — no LLM call). Wiring "save + instant
-        # re-render via cache" back into carousel.spec/renderer is a Phase 4
-        # concern; this scope is the editor surface the task specifies.
-        st.text_input("Headline", value=slide.headline, key=f"headline_input_{carousel.id}_{index}")
-        st.text_area("Body", value=slide.body, key=f"body_input_{carousel.id}_{index}", height=80)
+        # Inline text editor (Model C — no LLM call, $0 cost, Decision #16).
+        new_headline = st.text_input(
+            "Headline", value=slide.headline, key=f"headline_input_{carousel.id}_{index}"
+        )
+        new_body = st.text_area(
+            "Body", value=slide.body, key=f"body_input_{carousel.id}_{index}", height=80
+        )
+        if st.button("💾 Save", key=f"save_slide_{carousel.id}_{index}"):
+            try:
+                _save_slide_edit(
+                    carousel=carousel,
+                    slide_index=index,
+                    new_headline=new_headline,
+                    new_body=new_body,
+                    domain=_infer_domain(carousel),
+                )
+                st.session_state[edit_key] = False
+                st.rerun()
+            except Exception as e:
+                st.error(f"Failed to save slide edit: {e}")
+
+
+def _save_slide_edit(
+    carousel: Carousel,
+    slide_index: int,
+    new_headline: str,
+    new_body: str,
+    domain: str,
+) -> None:
+    """
+    Model C inline edit — no LLM call, $0 cost (Blueprint §5.4, Decision #16).
+    Updates slide text, re-renders that slide's PNG, persists to Supabase.
+    """
+    slide = carousel.spec.slides[slide_index]
+    slide.headline = new_headline
+    slide.body = new_body
+    slide.manually_edited = True
+    slide.text_hash = hashlib.md5((new_headline + new_body).encode()).hexdigest()
+
+    # LayoutChoice (template/accent/theme) isn't persisted on Carousel — only
+    # the plain CarouselSpec is. pick_layouts() is deterministic and cheap
+    # ($0, <10ms), so re-deriving it here is correct and avoids reaching into
+    # layout_picker's private per-slide helpers.
+    enriched_spec = pick_layouts(carousel.spec, domain)
+    enriched_slide = enriched_spec.slides[slide_index]
+
+    new_png_path = render_slide(
+        enriched_slide,
+        force=True,
+        slide_index=slide_index,
+        total_slides=len(carousel.spec.slides),
+    )
+
+    paths = list(carousel.slide_paths)
+    paths[slide_index] = str(new_png_path)
+    carousel.slide_paths = paths
+
+    upsert_carousel(carousel)
 
 
 def _render_caption_section(carousel: Carousel) -> None:
