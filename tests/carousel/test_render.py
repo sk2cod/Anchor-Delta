@@ -25,12 +25,15 @@ TEST_CONTENT_STATEMENT = {
     "accent_colour": "#C8813A",
     "headline": "This isn't a territorial war anymore.",
     "body_html": (
-        'Ukraine figured out something '
-        '<em class="accent">dangerous</em>'
-        ' — Russia\'s refineries fund the entire war machine. '
-        'Strike the supply chain, and the tanks stop moving.'
+        'Pakistan is bombing to force a government to act. '
+        'Afghanistan\'s Taliban shares ideological roots with the TTP. '
+        'The two groups fought alongside each other for years. '
+        'Pakistan cannot reach the TTP itself. Its answer: bomb Afghan '
+        'territory until the Taliban does the policing work. The civilians '
+        'caught between them are not the target. They are the '
+        '<em class="accent">pressure</em>.'
     ),
-    "page_indicator": "4 / 8",
+    "page_indicator": "5 / 8",
     "wordmark": "ANCHOR & DELTA",
 }
 
@@ -38,8 +41,8 @@ TEST_CONTENT_HOOK = {
     "template": "hook.html",
     "domain_label": "WORLD",
     "accent_colour": "#C8813A",
-    "headline": "Putin doesn't admit problems.",
-    "emphasis_line": "Today, he did.",
+    "headline": "Pakistan called it counter-terrorism.",
+    "emphasis_line": "28 civilians died.",
     "page_indicator": "1 / 8",
     "wordmark": "ANCHOR & DELTA",
 }
@@ -63,12 +66,12 @@ TEST_CONTENT_QUOTE = {
     "template": "quote.html",
     "domain_label": "WORLD",
     "accent_colour": "#C8813A",
-    "attribution": "Volodymyr Zelensky, President of Ukraine",
+    "attribution": "Taliban spokesperson, June 29 2026",
     "quote_text": (
-        "Russia thought this was about land. "
-        "We showed them it was about survival."
+        "This was a cowardly act and an atrocity against "
+        "Afghan civilians."
     ),
-    "page_indicator": "5 / 8",
+    "page_indicator": "6 / 8",
     "wordmark": "ANCHOR & DELTA",
 }
 
@@ -77,10 +80,13 @@ TEST_CONTENT_TIMELINE = {
     "domain_label": "WORLD",
     "accent_colour": "#C8813A",
     "date_label": "JUNE 29, 2026",
-    "headline": "Ukraine struck the Kremlin's supply chain.",
+    "headline": "Pakistan bombed Afghan villages, killing 28 civilians.",
     "body_html": (
-        'Two refineries hit in a single night — '
-        '<em class="accent">800 miles</em> from the front line.'
+        'Pakistani warplanes and soldiers crossed into Afghanistan '
+        'and struck Mandokhel — a civilian village. At least 28 people '
+        'died, including children. Pakistan called it a '
+        'counter-terrorism operation. The strike came one day after '
+        'a suicide bomber hit a Pakistani military base in Karachi.'
     ),
     "page_indicator": "2 / 8",
     "wordmark": "ANCHOR & DELTA",
@@ -92,13 +98,14 @@ TEST_CONTENT_CONCEPT = {
     "accent_colour": "#C8813A",
     "headline": "Why refineries, not tanks.",
     "body_html": (
-        'Tanks need fuel. Fuel needs refineries. '
-        'Refineries are fixed, large, and visible. '
-        'Ukraine found the '
-        '<em class="accent">single point of failure</em> '
-        'in Russia\'s entire war machine.'
+        'Pakistan and Afghanistan share a volatile border. '
+        'Armed groups launch attacks into Pakistan from Afghan soil. '
+        'Pakistan bombs back. Civilians die. There is no peace process, '
+        'no functioning '
+        '<em class="accent">ceasefire</em>'
+        ', and no outside power willing to stop it.'
     ),
-    "page_indicator": "6 / 8",
+    "page_indicator": "3 / 8",
     "wordmark": "ANCHOR & DELTA",
 }
 

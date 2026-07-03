@@ -19,14 +19,14 @@
 
   /* Text colours */
   --text-primary: #E8E0D0;
-  --text-muted: #8A8078;
+  --text-muted: #B0A898;
   --text-footer: #4A4540;
 
   /* Accent — overridden per domain in template */
   --accent: #C8813A;
 
   /* Rule line */
-  --rule-opacity: 0.20;
+  --rule-opacity: 0.40;
 
   /* Spacing */
   --pad-x: 72px;
@@ -84,10 +84,7 @@ html, body {
   width: var(--canvas-width);
   height: var(--canvas-height);
   overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  padding: var(--pad-y) var(--pad-x);
-  padding-top: 160px;
+  background: var(--bg-primary);
 }
 
 .slide::before {
@@ -98,45 +95,59 @@ html, body {
   pointer-events: none;
 }
 
-.header {
-  /* domain tag sits here — top of slide */
-}
-
 .domain-tag {
+  position: absolute;
+  top: var(--pad-y);
+  left: var(--pad-x);
   font-family: var(--font-body);
   font-weight: 500;
-  font-size: 36px;           /* 18px at 1x, doubled for 2x render */
-  letter-spacing: 4px;       /* 2px at 1x, doubled */
+  font-size: 48px;
+  letter-spacing: 6px;
   text-transform: uppercase;
   color: var(--accent);
 }
 
 .footer {
+  position: absolute;
+  bottom: var(--pad-y);
+  left: var(--pad-x);
+  right: var(--pad-x);
   display: flex;
   justify-content: space-between;
   align-items: flex-end;
-  margin-top: auto;
+}
+
+.content-wrapper {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 180px var(--pad-x);
 }
 
 .page-indicator,
 .wordmark {
   font-family: var(--font-body);
   font-weight: 400;
-  font-size: 32px;
-  letter-spacing: 2px;
+  font-size: 36px;
+  letter-spacing: 3px;
   color: var(--text-footer);
   text-transform: uppercase;
 }
 
 .wordmark {
   font-weight: 500;
-  letter-spacing: 2px;
+  letter-spacing: 3px;
 }
 
 .rule {
   width: 100%;
   height: 2px;                /* 1px at 1x, doubled for 2x render */
   background: var(--accent);
-  opacity: 0.20;               /* Decision #45 — barely-there structural divider */
+  opacity: var(--rule-opacity); /* Decision #45 — structural divider */
   margin: var(--gap-md) 0;
 }

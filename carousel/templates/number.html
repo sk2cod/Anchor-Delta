@@ -9,11 +9,9 @@
     .slide { --accent: {{ accent_colour }}; }
 
     .content {
-      flex: 1;
+      width: 100%;
       display: flex;
       flex-direction: column;
-      justify-content: center;
-      padding: 80px 0;
     }
 
     .date-label {
@@ -84,24 +82,25 @@
 <body>
 <div class="slide">
   <div class="domain-tag">{{ domain_label }}</div>
+  <div class="content-wrapper">
+    <div class="content">
+      <div class="date-label">{{ date_label }}</div>
+      <h1 class="headline">{{ headline }}</h1>
 
-  <div class="content">
-    <div class="date-label">{{ date_label }}</div>
-    <h1 class="headline">{{ headline }}</h1>
+      <div class="number-rows">
+        <div class="number-row">
+          <span class="number-label">{{ number_row_1_label }}</span>
+          <span class="dominant-number">{{ number_row_1_value }}</span>
+        </div>
+        <div class="number-divider"></div>
+        <div class="number-row">
+          <span class="number-label">{{ number_row_2_label }}</span>
+          <span class="dominant-number">{{ number_row_2_value }}</span>
+        </div>
+      </div>
 
-    <div class="number-rows">
-      <div class="number-row">
-        <span class="number-label">{{ number_row_1_label }}</span>
-        <span class="dominant-number">{{ number_row_1_value }}</span>
-      </div>
-      <div class="number-divider"></div>
-      <div class="number-row">
-        <span class="number-label">{{ number_row_2_label }}</span>
-        <span class="dominant-number">{{ number_row_2_value }}</span>
-      </div>
+      <p class="context-label">{{ context_label }}</p>
     </div>
-
-    <p class="context-label">{{ context_label }}</p>
   </div>
 
   <footer class="footer">

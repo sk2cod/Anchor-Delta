@@ -37,6 +37,10 @@
     }
 
     .cta-footer {
+      position: absolute;
+      bottom: var(--pad-y);
+      left: var(--pad-x);
+      right: var(--pad-x);
       text-align: center;
       font-family: var(--font-body);
       font-weight: 500;
@@ -44,18 +48,21 @@
       letter-spacing: 2px;
       color: var(--text-footer);
       text-transform: uppercase;
-      padding-bottom: var(--pad-y);
     }
   </style>
 </head>
 <body>
 <div class="slide">
-  <div class="cta-content">
-    <p class="cta-line-1">Follow {{ handle }}</p>
-    <p class="cta-line-2">for daily intelligence</p>
+  <div class="content-wrapper">
+    <div class="cta-content">
+      <p class="cta-line-1">Follow {{ handle }}</p>
+      <p class="cta-line-2">for daily intelligence</p>
+    </div>
   </div>
 
-  <div class="cta-footer">{{ wordmark }}</div>
+  <footer class="cta-footer">
+    <span class="wordmark">{{ wordmark }}</span>
+  </footer>
 </div>
 </body>
 </html>
