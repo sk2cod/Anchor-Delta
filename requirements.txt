@@ -12,3 +12,7 @@ scikit-learn
 simhash
 beautifulsoup4
 lxml
+PyYAML
+playwright
+Pillow
+Jinja2
