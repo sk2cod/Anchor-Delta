@@ -8,10 +8,15 @@
     /* accent override — set by caller per domain */
     .slide { --accent: {{ accent_colour }}; }
 
+    /* A lone pull-quote has nothing tall to fill the upper band, so both
+       block-top (bottom void) and space-between (middle void) look off.
+       Center the attribution+quote as one unit instead: the leftover space
+       splits into symmetric top/bottom margins, which reads as intentional
+       breathing room. This is the recognised pull-quote treatment.
+       To switch back to top-aligned block, change 'center' to 'flex-start'. */
     .content {
-      width: 100%;
-      display: flex;
-      flex-direction: column;
+      --measure: 1300px;
+      justify-content: center;
     }
 
     .attribution {

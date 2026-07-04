@@ -34,6 +34,15 @@
   --gap-sm: 16px;
   --gap-md: 32px;
   --gap-lg: 48px;
+
+  /* Content band — top clears the domain tag with a breathing gap,
+     bottom clears the footer with buffer. Tune globally here. */
+  --content-top: 380px;
+  --content-bottom: 220px;
+
+  /* Default measure cap. Each template overrides this to control where
+     its headline/body wraps. This is a fallback only. */
+  --measure: 1500px;
 }
 
 /* Playfair Display — weights 700 and 900 only (Decision #43) */
@@ -117,16 +126,30 @@ html, body {
   align-items: flex-end;
 }
 
+/* Content band.
+   - Top-aligned so leftover whitespace pools at the BOTTOM (reads as
+     intentional) rather than being split above+below (reads as floaty).
+   - Left-aligned so content sits under the WORLD tag.
+   - flex:1 lets the content own the whole vertical band, so templates
+     that opt into justify-content: space-between can spread their groups. */
 .content-wrapper {
   position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  inset: 0;
   display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 180px var(--pad-x);
+  flex-direction: column;
+  align-items: flex-start;
+  padding: var(--content-top) var(--pad-x) var(--content-bottom);
+}
+
+/* Shared content defaults. Templates set their own --measure to control
+   the wrap point; they inherit the rest. */
+.content {
+  width: 100%;
+  max-width: var(--measure);
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;   /* block mode; templates may override */
 }
 
 .page-indicator,
@@ -146,7 +169,7 @@ html, body {
 
 .rule {
   width: 100%;
-  height: 2px;                /* 1px at 1x, doubled for 2x render */
+  height: 2px;                  /* 1px at 1x, doubled for 2x render */
   background: var(--accent);
   opacity: var(--rule-opacity); /* Decision #45 — structural divider */
   margin: var(--gap-md) 0;
