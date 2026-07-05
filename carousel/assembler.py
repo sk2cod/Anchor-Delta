@@ -19,7 +19,7 @@ from db.carousel_queries import upsert_carousel
 
 HASHTAGS_YAML_PATH = Path(__file__).parent / "hashtags.yaml"
 DEFAULT_HASHTAG_COUNT = 20
-BRAND_HANDLE = "@anchoranddelta"  # placeholder per Decision #29
+BRAND_HANDLE = "@anchordelta"  # placeholder per Decision #29
 
 
 class AssemblerError(Exception):

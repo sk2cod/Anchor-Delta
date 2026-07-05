@@ -35,7 +35,7 @@ FINAL_HEIGHT = 1350
 
 BRAND_VERSION = "1.1"  # bump when CSS changes, to invalidate the render cache
 WORDMARK = "ANCHOR & DELTA"
-CTA_HANDLE = "@anchoranddelta"  # placeholder per Decision #29
+CTA_HANDLE = "@anchordelta"  # placeholder per Decision #29
 
 DOMAIN_DISPLAY_LABELS = {
     "world": "WORLD",
