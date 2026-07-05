@@ -234,6 +234,13 @@ it matters beyond this story."
 Job: let a number do the talking.
 Word budget: the number + label (e.g. "435 mi"),
 ≤25 words context below.
+Headline is mandatory on proof slides. State the number in plain
+English as the headline. Examples:
+
+dominant_number.value="4", label="days" → headline: "4 days."
+dominant_number.value="$2.3T", label="at stake" → headline:
+"Two point three trillion dollars at stake."
+Keep it under 8 words. The number must appear in the headline.
 One number per proof slide. The number must be
 hook-grade — large, dramatic, or counterintuitive.
 Do not dilute with a second number.

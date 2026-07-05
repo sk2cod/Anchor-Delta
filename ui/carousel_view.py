@@ -110,6 +110,10 @@ def _render_slide_controls(carousel: Carousel, index: int, slide) -> None:
                     )
                     for j, s in enumerate(carousel.spec.slides):
                         if s.slot_id == new_slide.slot_id:
+                            # Save previous slide for undo
+                            st.session_state[
+                                f"prev_slide_{carousel.id}_{index}"
+                            ] = carousel.spec.slides[j].model_copy()
                             carousel.spec.slides[j] = new_slide
                             break
                     enriched = pick_layouts(carousel.spec, domain)
@@ -131,6 +135,37 @@ def _render_slide_controls(carousel: Carousel, index: int, slide) -> None:
                     st.rerun()
                 except Exception as e:
                     st.error(f"Regenerate failed: {e}")
+        if st.session_state.get(f"prev_slide_{carousel.id}_{index}"):
+            if st.button("↩️", key=f"undo_{carousel.id}_{index}",
+                         help="Restore previous slide"):
+                try:
+                    prev = st.session_state[f"prev_slide_{carousel.id}_{index}"]
+                    for j, s in enumerate(carousel.spec.slides):
+                        if s.slot_id == prev.slot_id:
+                            carousel.spec.slides[j] = prev
+                            break
+                    domain = _infer_domain(carousel)
+                    enriched = pick_layouts(carousel.spec, domain)
+                    target_enriched = next(
+                        es for es in enriched.slides
+                        if es.slide.slot_id == prev.slot_id
+                    )
+                    new_path = render_slide(
+                        target_enriched,
+                        slide_index=index,
+                        total_slides=len(carousel.spec.slides),
+                        force=True,
+                    )
+                    paths = list(carousel.slide_paths)
+                    paths[index] = str(new_path)
+                    carousel.slide_paths = paths
+                    upsert_carousel(carousel)
+                    st.session_state[f"carousel_{carousel.card_id}"] = carousel
+                    # Clear undo state
+                    st.session_state.pop(f"prev_slide_{carousel.id}_{index}")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Undo failed: {e}")
     with btn_cols[2]:
         locked = st.session_state.setdefault(lock_key, slide.manually_edited)
         if st.button("🔒" if locked else "🔓", key=f"lock_btn_{carousel.id}_{index}", help="Lock this slide"):

@@ -102,7 +102,10 @@ def _build_variables(enriched_slide: EnrichedSlide, domain_label: str, page_indi
         variables["emphasis_line"] = slide.body
     elif template_id == "number":
         variables["date_label"] = _extract_date_label(slide.body, slide.headline)
-        variables["headline"] = slide.headline
+        headline = slide.headline
+        if not headline and slide.dominant_number:
+            headline = f"{slide.dominant_number.value} {slide.dominant_number.label}"
+        variables["headline"] = headline
         if slide.dominant_number is not None:
             variables["number_row_1_label"] = slide.dominant_number.label
             variables["number_row_1_value"] = slide.dominant_number.value
