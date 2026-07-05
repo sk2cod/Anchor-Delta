@@ -13,12 +13,12 @@ from pathlib import Path
 
 import yaml
 
-from carousel.cache import record_hashtag_use
+from carousel.cache import get_recent_hashtags, record_hashtag_use
 from carousel.models import Carousel, CarouselSpec, CarouselStatus, EnrichedSpec
 from db.carousel_queries import upsert_carousel
 
 HASHTAGS_YAML_PATH = Path(__file__).parent / "hashtags.yaml"
-DEFAULT_HASHTAG_COUNT = 20
+DEFAULT_HASHTAG_COUNT = 5
 BRAND_HANDLE = "@anchordelta"  # placeholder per Decision #29
 
 
@@ -42,42 +42,55 @@ def build_hashtags(
     n: int = DEFAULT_HASHTAG_COUNT,
 ) -> list[str]:
     """
-    Sample n hashtags from the curated YAML pool.
-    Weighted toward domain tags. Always include
-    cross_domain tags. Returns list of hashtag strings
-    with # prefix.
-
-    Records the selected set to the rotation log (carousel/cache.py) so
-    future selections can check for repeats.
-
-    TODO(v1.5+): actually use get_recent_hashtags() to avoid repeating the
-    exact same set as the previous post (anti-shadowban heuristic per
-    Blueprint §5.7). Recording is wired up; the avoidance check is not.
+    Select exactly 5 hashtags per post.
+    Formula:
+    - #anchordelta (brand, always)
+    - #intelligencebriefing (category, always)
+    - 1 mid-volume tag from domain pool (rotated)
+    - 2 niche tags matched to hashtag_themes
+    Total: 5
     """
     pool = _load_hashtag_pool()
-    domain_pool = list(pool.get(domain, []))
-    cross_pool = list(pool.get("cross_domain", []))
 
+    domain_pool = pool.get(domain, {})
     if not domain_pool:
         raise AssemblerError(f"No hashtag pool found for domain {domain!r}")
 
+    niche_tags = domain_pool.get("niche", [])
+    mid_volume_tags = domain_pool.get("mid_volume", [])
+
+    # Fixed slots — always included
+    fixed = ["anchordelta", "intelligencebriefing"]
+
+    # 1 mid-volume tag — rotate through pool to avoid repetition
+    recent = get_recent_hashtags(3)
+    recent_flat = set(tag.lstrip("#") for s in recent for tag in s)
+
+    available_mid = [t for t in mid_volume_tags if t not in recent_flat]
+    if not available_mid:
+        available_mid = mid_volume_tags  # reset if all used recently
+    mid_pick = [random.choice(available_mid)]
+
+    # 2 niche tags — match to hashtag_themes
     themes_lower = [t.lower() for t in hashtag_themes]
 
-    def is_theme_matched(tag: str) -> bool:
-        tag_lower = tag.lower()
-        return any(tag_lower in theme or theme in tag_lower for theme in themes_lower)
+    def theme_score(tag: str) -> int:
+        return sum(
+            1 for theme in themes_lower
+            if theme in tag or tag in theme
+        )
 
-    remaining_slots = max(n - len(cross_pool), 0)
+    scored = sorted(niche_tags, key=theme_score, reverse=True)
+    niche_picks = [t for t in scored if t not in recent_flat][:2]
 
-    matched = [t for t in domain_pool if is_theme_matched(t)]
-    unmatched = [t for t in domain_pool if t not in matched]
-    random.shuffle(matched)
-    random.shuffle(unmatched)
+    # Fallback if fewer than 2 niche matches
+    if len(niche_picks) < 2:
+        fallback = [t for t in niche_tags if t not in niche_picks]
+        niche_picks += fallback[:2 - len(niche_picks)]
 
-    domain_selection = (matched + unmatched)[:remaining_slots]
-
-    selected = domain_selection + cross_pool
-    random.shuffle(selected)
+    # Assemble final 5
+    selected = fixed + mid_pick + niche_picks
+    selected = selected[:5]  # hard cap
 
     hashtags = [f"#{tag}" for tag in selected]
     record_hashtag_use(hashtags)

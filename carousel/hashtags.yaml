@@ -1,117 +1,83 @@
 # Anchor & Delta — Curated hashtag pool
-# Structure: domain-specific tags + cross-domain tags.
-# HashtagBuilder samples 18-22 tags per carousel.
-# Pool size: ~30 per domain + 15 cross-domain.
+# Philosophy: low-to-medium volume, high specificity, story searchability
+# Selection: 5 tags per post — 1 brand + 1 category + 1 mid-volume + 2 niche
+# Pool size: 20 per domain (15 niche + 5 mid-volume) + 5 cross-domain
 
 world:
-  - worldnews
-  - geopolitics
-  - internationalnews
-  - globalaffairs
-  - foreignpolicy
-  - conflictnews
-  - warreporting
-  - breakingnews
-  - newsanalysis
-  - currentevents
-  - politicalnews
-  - worldpolitics
-  - crisis
-  - intelligence
-  - diplomacy
-  - humanrights
-  - nationalsecurity
-  - defencenews
-  - militarynews
-  - conflictzone
-  - peaceandsecurity
-  - statecraft
-  - powerpolitics
-  - regimechange
-  - civilwar
-  - sanctions
-  - refugeecrisis
-  - climatesecurity
-  - nuclearstrategy
-  - informationwarfare
+  niche:
+    - geopoliticalrisk
+    - conflictanalysis
+    - foreignpolicywatch
+    - securitystudies
+    - wareconomics
+    - stateconflict
+    - sanctionspolicy
+    - regimeanalysis
+    - crisiswatch
+    - nucleardiplomacy
+    - civilianwarfare
+    - powerpolitics
+    - defencepolicy
+    - geopoliticalintelligence
+    - warreporting
+  mid_volume:
+    - geopolitics
+    - worldpolitics
+    - internationalnews
+    - foreignpolicy
+    - globalaffairs
 
 finance:
-  - finance
-  - economics
-  - markets
-  - investing
-  - economy
-  - financenews
-  - stockmarket
-  - macroeconomics
-  - tradepolicy
-  - globaleconomy
-  - centralbank
-  - inflation
-  - monetarypolicy
-  - financialmarkets
-  - businessnews
-  - interestrates
-  - recession
-  - fiscalpolicy
-  - tradewar
-  - supplychain
-  - commodities
-  - energymarkets
-  - currencies
-  - forex
-  - hedgefunds
-  - privateequity
-  - venturecapital
-  - startups
-  - economicpolicy
-  - debtcrisis
+  niche:
+    - macrotrends
+    - centralbanking
+    - tradewarimpact
+    - monetarypolicywatch
+    - economicwarfare
+    - debtcrisis
+    - emergingmarketrisks
+    - inflationwatch
+    - fiscalpolicy
+    - tradeeconomics
+    - commoditymarkets
+    - currencywars
+    - economiccoercion
+    - sanctionseconomics
+    - globalrecession
+  mid_volume:
+    - economics
+    - markets
+    - globaleconomy
+    - tradepolicy
+    - businessnews
 
 ai_tech:
-  - artificialintelligence
-  - ai
-  - technology
-  - techindustry
-  - machinelearning
-  - airegulation
-  - bigtech
-  - technews
-  - aipolicy
-  - futureoftech
-  - aiethics
-  - deeplearning
-  - ainews
-  - techpolicy
-  - innovation
-  - generativeai
-  - llm
-  - openai
-  - anthropic
-  - nvidia
-  - semiconductors
-  - aigovernance
-  - techgeopolitics
-  - dataprivacy
-  - cybersecurity
-  - cloudcomputing
-  - airesearch
-  - foundationmodels
-  - aistartups
-  - techregulation
+  niche:
+    - aigovernance
+    - anthropicai
+    - llmresearch
+    - aipolicywatch
+    - techgeopolitics
+    - airegulation
+    - foundationmodels
+    - claudeai
+    - openaiwatch
+    - nvidiaai
+    - semiconductorwar
+    - sovereignai
+    - aiglobalpolicy
+    - techsovereignty
+    - aienterprise
+  mid_volume:
+    - artificialintelligence
+    - technews
+    - aipolicy
+    - bigtech
+    - machinelearning
 
 cross_domain:
   - anchordelta
-  - dailyintelligence
-  - newsbreak
-  - analysis
-  - explained
+  - intelligencebriefing
+  - newsanalysis
   - context
-  - intelligence
-  - briefing
-  - deepdive
-  - worldnews
-  - geopolitics
-  - newsletter
-  - morningbriefing
-  - newsworthy
-  - stayinformed
+  - explained
