@@ -17,6 +17,7 @@ import os
 import uuid
 from datetime import datetime
 from pathlib import Path
+from typing import Optional
 
 import anthropic
 from dotenv import load_dotenv
@@ -28,6 +29,7 @@ load_dotenv()
 SONNET_MODEL = "claude-sonnet-4-6"
 MAX_TOKENS = 4000
 PROMPT_PATH = Path(__file__).parent / "prompts" / "writer_v1_0.md"
+REGEN_PROMPT_PATH = Path(__file__).parent / "prompts" / "regenerate_v1_0.md"
 
 # Sonnet pricing per Blueprint-specified formula (per token, not per 1M).
 INPUT_COST_PER_TOKEN = 0.000003
@@ -225,4 +227,122 @@ def write_carousel(
             raise CarouselWriteError(
                 f"Writer output failed validation twice. First error: {first_error}. "
                 f"Second error: {second_error}."
+            ) from second_error
+
+
+def regenerate_slide(
+    spec: CarouselSpec,
+    slot_id: str,
+    domain: str,
+    card_id: str,
+    instruction: Optional[str] = None,
+    prompt_version: str = "regenerate-v1.0",
+) -> Slide:
+    """
+    Model B — targeted slide regenerate.
+    One Sonnet call replacing a single slide.
+    Locked (manually_edited=True) slides are never passed
+    as the target.
+    Cost: ~$0.008. Latency: 3-5 seconds.
+    """
+    if not REGEN_PROMPT_PATH.exists():
+        raise CarouselWriteError(f"Regenerate prompt not found at {REGEN_PROMPT_PATH}")
+    system_prompt = REGEN_PROMPT_PATH.read_text(encoding="utf-8")
+
+    target = next(
+        (s for s in spec.slides if s.slot_id == slot_id),
+        None,
+    )
+    if target is None:
+        raise CarouselWriteError(f"slot_id {slot_id} not found")
+    if target.manually_edited:
+        raise CarouselWriteError(
+            f"Slide {slot_id} is locked (manually_edited=True)"
+        )
+
+    other_slides_lines = []
+    for s in spec.slides:
+        if s.slot_id == slot_id:
+            continue
+        line = f"[{s.slot_id}] {s.headline}"
+        if s.body:
+            line += f"\n{s.body}"
+        other_slides_lines.append(line)
+    other_slides = "\n".join(other_slides_lines)
+
+    user_message = (
+        f"DOMAIN: {domain}\n"
+        f"CARD: {spec.card_id}\n"
+        f"EXISTING CAROUSEL (do not change these slides):\n"
+        f"{other_slides}\n"
+        f"SLIDE TO REPLACE:\n"
+        f"slot_id: {slot_id}\n"
+        f"role: {target.role.value}\n"
+        f"current headline: {target.headline}\n"
+        f"current body: {target.body}\n"
+    )
+    if instruction:
+        user_message += f"INSTRUCTION FROM EDITOR: {instruction}\n"
+    else:
+        user_message += "No specific instruction — write a stronger version.\n"
+    user_message += "Write one replacement slide only."
+
+    api_key = os.environ.get("CAROUSEL_ANTHROPIC_API_KEY")
+    if not api_key:
+        raise CarouselWriteError(
+            "CAROUSEL_ANTHROPIC_API_KEY is not set. This is a separate "
+            "billing account from ANTHROPIC_API_KEY (Intelligence Engine "
+            "pipeline) — set it in .env before running CarouselWriter."
+        )
+
+    client = anthropic.Anthropic(api_key=api_key)
+
+    def _call_and_parse(msg: str) -> Slide:
+        try:
+            response = client.messages.create(
+                model=SONNET_MODEL,
+                max_tokens=500,
+                system=system_prompt,
+                messages=[{"role": "user", "content": msg}],
+            )
+        except Exception as e:
+            raise CarouselWriteError("Sonnet regenerate call failed") from e
+
+        response_text = response.content[0].text
+        data = json.loads(_strip_json_fences(response_text))
+        new_slide = Slide(
+            slot_id=slot_id,
+            role=target.role,
+            headline=data["headline"],
+            body=data.get("body", ""),
+            emphasis_word=data.get("emphasis_word"),
+            quote=data.get("quote"),
+            dominant_number=data.get("dominant_number"),
+            notes=data.get("notes"),
+            manually_edited=False,
+            text_hash=hashlib.md5(
+                (data["headline"] + data.get("body", "")).encode()
+            ).hexdigest(),
+        )
+        cost_usd = (
+            response.usage.input_tokens * INPUT_COST_PER_TOKEN
+            + response.usage.output_tokens * OUTPUT_COST_PER_TOKEN
+        )
+        _ = cost_usd  # tracked; caller can log if needed
+        return new_slide
+
+    try:
+        return _call_and_parse(user_message)
+    except Exception as first_error:
+        retry_message = (
+            user_message
+            + f"\n\nYour previous response failed with: {first_error}\n"
+            + "Return valid JSON only, matching the required structure exactly."
+        )
+        try:
+            return _call_and_parse(retry_message)
+        except Exception as second_error:
+            raise CarouselWriteError(
+                f"Regenerate failed twice. First: {first_error}. "
+                f"Second: {second_error}."
             ) from second_error

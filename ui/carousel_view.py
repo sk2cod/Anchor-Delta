@@ -89,14 +89,48 @@ def _render_slide_controls(carousel: Carousel, index: int, slide) -> None:
         if st.button("✏️", key=f"edit_btn_{carousel.id}_{index}", help="Edit this slide"):
             st.session_state[edit_key] = not st.session_state.get(edit_key, False)
     with btn_cols[1]:
-        st.button(
-            "🔄",
-            key=f"regen_btn_{carousel.id}_{index}",
-            help="Targeted regenerate coming in v1.1",
-            disabled=True,
+        regen_instruction = st.text_input(
+            "Regenerate instruction (optional)",
+            placeholder="e.g. make the hook sharper",
+            key=f"regen_instruction_{carousel.id}_{index}",
+            label_visibility="collapsed",
         )
-        # Wired but inert in v1.0 — would set:
-        #   st.session_state[f"regenerating_slide_{carousel.id}_{index}"] = True
+        if st.button("🔄", key=f"regen_{carousel.id}_{index}",
+                     help="Regenerate this slide"):
+            with st.spinner("Regenerating slide..."):
+                try:
+                    from carousel.writer import regenerate_slide
+                    domain = _infer_domain(carousel)
+                    new_slide = regenerate_slide(
+                        spec=carousel.spec,
+                        slot_id=slide.slot_id,
+                        domain=domain,
+                        card_id=carousel.card_id,
+                        instruction=regen_instruction if regen_instruction else None,
+                    )
+                    for j, s in enumerate(carousel.spec.slides):
+                        if s.slot_id == new_slide.slot_id:
+                            carousel.spec.slides[j] = new_slide
+                            break
+                    enriched = pick_layouts(carousel.spec, domain)
+                    target_enriched = next(
+                        es for es in enriched.slides
+                        if es.slide.slot_id == new_slide.slot_id
+                    )
+                    new_path = render_slide(
+                        target_enriched,
+                        slide_index=index,
+                        total_slides=len(carousel.spec.slides),
+                        force=True,
+                    )
+                    paths = list(carousel.slide_paths)
+                    paths[index] = str(new_path)
+                    carousel.slide_paths = paths
+                    upsert_carousel(carousel)
+                    st.session_state[f"carousel_{carousel.card_id}"] = carousel
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Regenerate failed: {e}")
     with btn_cols[2]:
         locked = st.session_state.setdefault(lock_key, slide.manually_edited)
         if st.button("🔒" if locked else "🔓", key=f"lock_btn_{carousel.id}_{index}", help="Lock this slide"):
