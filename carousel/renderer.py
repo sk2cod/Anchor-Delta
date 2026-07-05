@@ -33,7 +33,7 @@ RENDER_HEIGHT = 2700
 FINAL_WIDTH = 1080
 FINAL_HEIGHT = 1350
 
-BRAND_VERSION = "1.0"  # bump when CSS changes, to invalidate the render cache
+BRAND_VERSION = "1.1"  # bump when CSS changes, to invalidate the render cache
 WORDMARK = "ANCHOR & DELTA"
 CTA_HANDLE = "@anchoranddelta"  # placeholder per Decision #29
 
