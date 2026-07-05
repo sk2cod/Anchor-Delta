@@ -316,3 +316,44 @@ Key commits in order:
 - `b85e56b` — feat: automatic card archiving after 7 days
 - `d3e4af2` — feat: manual archive button per card
 - `4ecf70c` — fix: null chain_latex guard
+
+---
+
+## 14. Carousel Engine Lessons
+
+### Test content must match production content
+The single biggest time sink during template design was iterating
+on layouts using short placeholder test strings. Short content
+produces misleading renders — layouts that look broken with 3 words
+look correct with 25 words. Always use real production-length
+content in test scripts from day one.
+
+### Playwright on Streamlit Cloud is not viable
+Playwright requires system-level Chromium dependencies unavailable
+on Streamlit Cloud's containerised environment. Design carousel
+generation as a local tool from day one. Do not attempt to make
+it cloud-compatible until v2 with a proper rendering API.
+
+### Domain belongs on CarouselSpec
+Domain is not stored on CarouselSpec or EnrichedSpec. This caused
+repeated workarounds — reverse lookup via DOMAIN_ACCENTS in three
+separate modules. Add domain to CarouselSpec in v1.5. One field,
+eliminates all reverse lookups.
+
+### One LLM call per carousel is the right discipline
+The single Sonnet call + single Haiku call architecture held up
+through the entire build. Voice consistency is better than
+multi-call approaches. Targeted regenerate adds calls only when
+the user explicitly requests it. Steady-state cost: ~$0.037/carousel.
+
+### justify-content: space-between breaks short content
+space-between on flex containers splits content to extremes with
+short text — headline pins top, body pins bottom, void in the
+middle. Top-aligned flex-start with controlled padding is more
+predictable for variable-length editorial content.
+
+### pyyaml must be in requirements.txt
+If any module imports yaml, pyyaml must be explicitly in
+requirements.txt. It is not included in common Python environments
+by default and will cause silent failures on fresh installs and
+Streamlit Cloud deployments.

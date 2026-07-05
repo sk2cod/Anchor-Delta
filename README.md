@@ -10,9 +10,33 @@ Instead of scrolling through headlines, Anchor & Delta builds **living story car
 - **Live Status Tracker** — dated delta events, most recent first. Each new development appends to the same card.
 - **Conceptual Transmission** — the causal chain explaining why this story matters and where it leads.
 
-## Carousel Engine (in development)
+## Carousel Engine
 
-Converts finalised Story Cards into publish-ready Instagram carousels — eight slide PNGs plus caption, pinned comment, and hashtags per card. Currently in Phase 1 scaffolding, ahead of template-design week. See [CAROUSEL_BLUEPRINT_v1.md](CAROUSEL_BLUEPRINT_v1.md) for the architecture and [CAROUSEL_DECISIONS.md](CAROUSEL_DECISIONS.md) for the decisions log.
+Converts finalised Story Cards into publish-ready Instagram
+carousels. Eight slide PNGs + caption + pinned comment +
+hashtag list per carousel.
+
+**Status:** v1.0 — operational, local use only.
+
+**How it works:**
+1. Click 🎠 on any World / Finance / AI & Tech card in the dashboard
+2. The engine generates 8 slides via a single Sonnet call (~$0.036)
+3. Review slides, caption, and pinned comment in the preview UI
+4. Click Approve & Sync to export the bundle to outputs/bundles/
+5. Transfer PNGs to phone and post to Instagram manually
+
+**Cost per carousel:** ~$0.037 (1 Sonnet call + 1 Haiku call)
+
+**Architecture:** 7-stage pipeline —
+CardLoader → ContextBuilder → CarouselPlanner → CarouselWriter →
+LayoutPicker → SlideRenderer → PostAssembler
+
+See [CAROUSEL_BLUEPRINT_v1.md](CAROUSEL_BLUEPRINT_v1.md) for the
+architectural spine and [CAROUSEL_DECISIONS.md](CAROUSEL_DECISIONS.md)
+for the decisions log.
+
+**Note:** Carousel generation requires local Streamlit only.
+Playwright (slide renderer) is not supported on Streamlit Cloud.
 
 ## Tech Stack
 

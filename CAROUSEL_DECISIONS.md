@@ -544,6 +544,45 @@ generates. Unnecessary complexity.
 
 ---
 
+## #49 — Domain not stored in EnrichedSpec
+
+**Date:** 2026-07-05
+**Decision:** Domain is not a field on CarouselSpec or EnrichedSpec.
+When domain is needed after generation (renderer, carousel_view),
+it is recovered via reverse lookup against DOMAIN_ACCENTS in
+layout_picker.py.
+**Why:** Adding domain to CarouselSpec would require a models.py
+change and a Supabase migration. Reverse lookup is a pragmatic
+v1.0 fix.
+**Status:** Open — domain should be added to CarouselSpec in v1.5
+to eliminate the reverse lookup dependency.
+
+---
+
+## #50 — Playwright local-only for v1.0
+
+**Date:** 2026-07-05
+**Decision:** Carousel generation runs locally only. Playwright
+will not be supported on Streamlit Cloud in v1.0.
+**Why:** Playwright requires system-level Chromium dependencies
+not available on Streamlit Cloud's containerised environment.
+Cloud rendering is v2 work.
+**Status:** Active. Deferred to v2.
+
+---
+
+## #51 — Body text centred for social media register
+
+**Date:** 2026-07-05
+**Decision:** All slide content (headline and body) is centred
+horizontally. Left-aligned body was considered but rejected.
+**Why:** Primary use is Instagram carousel posts. Centred text
+performs better visually in the feed and matches the social
+media register.
+**Status:** Active.
+
+---
+
 ## Open questions to revisit
 
 - **Anonymous handle name.** Pending account creation.
@@ -567,3 +606,5 @@ generates. Unnecessary complexity.
   minimal Playwright render script as a design feedback tool. Supersedes
   #37 in letter only. Constraint recorded: the script must not import from
   `carousel/*.py` and must not carry Pydantic models.
+- 2026-07-05: Decisions #49–#51 added — domain schema gap,
+  Playwright local-only, body text centring for social media.
