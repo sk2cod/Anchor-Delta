@@ -583,13 +583,42 @@ media register.
 
 ---
 
+## #52 — Per-carousel sync folders in configurable Google Drive directory
+
+**Date:** 2026-07-06
+**Decision:** "Approve & Sync" writes each carousel's bundle into a
+per-carousel subfolder inside a configurable `CAROUSEL_SYNC_DIR`
+(env-driven, default `G:\My Drive\Anchor & Delta\Outbox`). Subfolder
+name is `YYYY-MM-DD_domain_slug`, where the date is the generation
+date, domain is the card's domain, and slug is a filesystem-safe slug
+of the card's `umbrella_title`. If the target subfolder already exists
+(same-day regenerate of the same card), a short suffix is appended —
+never overwrite an existing bundle. Failures (unwritable path, drive
+unavailable) raise loudly and surface in the Streamlit UI.
+**Why:** Eliminates the manual copy-to-Drive step and keeps the
+native-app music/photo sync workflow the user already has. ISO date
+prefix sorts subfolders chronologically with zero stored state.
+**Alternatives considered:** A flat `Outbox/` folder with no
+subfolders — rejected, gets messy fast once more than a few carousels
+accumulate. A sequential counter (`C1`, `C2`, ...) — rejected, requires
+stored counter state, collides on resets, and doesn't sort
+chronologically the way an ISO date does.
+**Note:** This mildly strengthens the future case for Decision #49's
+domain-field fix (folder naming currently depends on the same
+card-lookup reverse-inference) without resolving it — that fix stays
+parked for v1.5.
+**Status:** Active.
+
+---
+
 ## Open questions to revisit
 
 - **Anonymous handle name.** Pending account creation.
 - **Final accent colour hex values per domain.** Pinned during template-design week.
 - **Display font selection.** Pinned during template-design week. Candidates: Space Grotesk (free), Inter Display (free), Founders Grotesk (paid), Pangram Sans (paid for commercial use).
 - **Body font selection.** Pinned during template-design week. Candidates: Inter, IBM Plex Sans.
-- **Exact sync-to-folder path.** Pinned at v1.0 ship — depends on user's iCloud vs Google Drive choice.
+- ~~**Exact sync-to-folder path.**~~ Resolved by Decision #52 —
+  configurable `CAROUSEL_SYNC_DIR`, defaults to a Google Drive path.
 - **Hashtag pool initial seeding.** Pre-launch task — build curated tag lists for World / Finance / AI & Tech.
 
 ---
@@ -608,3 +637,7 @@ media register.
   `carousel/*.py` and must not carry Pydantic models.
 - 2026-07-05: Decisions #49–#51 added — domain schema gap,
   Playwright local-only, body text centring for social media.
+- 2026-07-06: Decision #52 added — "Approve & Sync" now writes into
+  per-carousel `YYYY-MM-DD_domain_slug` subfolders under a configurable
+  `CAROUSEL_SYNC_DIR`, resolving the "exact sync-to-folder path" open
+  question. Blueprint §5.7 and §12.4 updated.

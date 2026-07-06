@@ -299,7 +299,7 @@ Conditional slots, added in this priority order if their conditions are met:
 
 **Caption assembly:** LLM-written caption (already in spec) + line break + brand handle + line break + hashtag block.
 
-**Export action:** When user clicks "Approve & Sync" in Streamlit, the engine writes the bundle to a configured local directory that auto-syncs to phone via iCloud / Google Drive. Bundle contents:
+**Export action:** When user clicks "Approve & Sync" in Streamlit, the engine writes the bundle into a per-carousel subfolder inside a configured directory that auto-syncs to phone via iCloud / Google Drive (Decision #52). Subfolder name: `YYYY-MM-DD_domain_slug` — the generation date, the card's domain, and a filesystem-safe slug of the card's `umbrella_title` (lowercase, hyphenated, capped ~40 chars). If that subfolder already exists (a same-day regenerate of the same card), a short suffix is appended rather than overwriting the existing bundle. The directory tree is created if missing; an unwritable or unavailable destination raises loudly rather than failing silently. Bundle contents (unchanged):
 - `01_hook.png`, `02_setup.png`, ..., `08_cta.png` (or fewer if slot plan produced fewer)
 - `caption.txt`
 - `pinned_comment.txt`
@@ -686,7 +686,7 @@ A "Generate Carousel" button is added to every card in the existing dashboard.
 
 ### 12.4 Sync destination
 
-User-configurable path in settings. Default: `~/iCloud Drive/AnchorDelta/Outbox/` on Apple; `~/Google Drive/AnchorDelta/Outbox/` otherwise. Engine has no knowledge of the sync layer; it just writes files to a configured directory.
+Configured via the `CAROUSEL_SYNC_DIR` environment variable (`config.py`), not a Streamlit setting (Decision #52). Default: `G:\My Drive\Anchor & Delta\Outbox`. Each approved carousel gets its own subfolder under this directory, named `YYYY-MM-DD_domain_slug` (generation date, card domain, slug of the card's `umbrella_title`) — this replaces the earlier flat-folder design and eliminates the manual copy-to-Drive step. A same-day regenerate of the same card gets a short suffix appended rather than colliding. If `CAROUSEL_SYNC_DIR` is unset or empty, the engine falls back to the local `outputs/bundles/` folder so nothing breaks when the env var is missing. Engine has no knowledge of the sync layer; it just writes files to a configured directory.
 
 ---
 

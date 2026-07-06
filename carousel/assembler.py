@@ -9,12 +9,17 @@ LLM-generated (Decision #31).
 
 import json
 import random
+import re
+from datetime import datetime
 from pathlib import Path
+from uuid import uuid4
 
 import yaml
 
 from carousel.cache import get_recent_hashtags, record_hashtag_use
 from carousel.models import Carousel, CarouselSpec, CarouselStatus, EnrichedSpec
+from config import CAROUSEL_SYNC_DIR
+from db.cards import get_card_by_id
 from db.carousel_queries import upsert_carousel
 
 HASHTAGS_YAML_PATH = Path(__file__).parent / "hashtags.yaml"
@@ -160,17 +165,75 @@ def assemble_carousel(
     return carousel
 
 
+_SLUG_INVALID_RE = re.compile(r"[^a-z0-9]+")
+
+
+def _lookup_card(carousel: Carousel) -> dict:
+    return get_card_by_id(carousel.card_id) or {}
+
+
+def _infer_domain(card_row: dict) -> str:
+    """Same fallback as ui/carousel_view.py._infer_domain (Decision #49) —
+    Carousel/CarouselSpec carry no domain field, so recover it from the
+    source card row."""
+    domain = card_row.get("domain")
+    return domain if domain in ("world", "finance", "ai_tech") else "world"
+
+
+def _slugify(text: str, max_len: int = 40) -> str:
+    slug = _SLUG_INVALID_RE.sub("-", text.lower()).strip("-")
+    return slug[:max_len].rstrip("-") or "untitled"
+
+
+def _bundle_folder_name(carousel: Carousel, card_row: dict) -> str:
+    """
+    Per-carousel sync subfolder name (Decision #52):
+    YYYY-MM-DD_domain_slug, where the date is the generation date and
+    the slug is derived from the source card's umbrella_title.
+    """
+    date_str = carousel.created_at.date().isoformat()
+    domain = _infer_domain(card_row)
+    slug = _slugify(card_row.get("umbrella_title") or "untitled")
+    return f"{date_str}_{domain}_{slug}"
+
+
+def _reserve_bundle_dir(base_dir: Path, folder_name: str) -> Path:
+    """
+    Collision guard (Decision #52) — never overwrite an existing bundle.
+    A same-day regenerate of the same card gets a time suffix; the rare
+    same-second collision falls back to a short hash.
+    """
+    candidate = base_dir / folder_name
+    if not candidate.exists():
+        return candidate
+    candidate = base_dir / f"{folder_name}_{datetime.now().strftime('%H%M%S')}"
+    if not candidate.exists():
+        return candidate
+    return base_dir / f"{folder_name}_{uuid4().hex[:4]}"
+
+
 def export_carousel(carousel: Carousel, output_dir: Path) -> Path:
     """
-    Write carousel bundle to output_dir.
+    Write carousel bundle to its per-carousel sync subfolder (Decision #52).
     Returns path to the bundle directory.
     Bundle: slide PNGs + caption.txt + pinned_comment.txt
             + hashtags.txt + manifest.json
+
+    Writes under CAROUSEL_SYNC_DIR (config.py) when set — typically a
+    Google Drive / iCloud synced folder, so "Approve & Sync" reaches the
+    phone without a manual copy step (Blueprint §12.4). Falls back to
+    output_dir if CAROUSEL_SYNC_DIR is unset/empty. This function has no
+    knowledge of the sync layer itself — it only ever writes to a
+    configured directory.
     """
-    output_dir = Path(output_dir)
-    bundle_dir = output_dir / str(carousel.id)
+    sync_root = CAROUSEL_SYNC_DIR.strip() if CAROUSEL_SYNC_DIR else ""
+    base_dir = Path(sync_root) if sync_root else Path(output_dir)
+    bundle_dir = base_dir
 
     try:
+        card_row = _lookup_card(carousel)
+        folder_name = _bundle_folder_name(carousel, card_row)
+        bundle_dir = _reserve_bundle_dir(base_dir, folder_name)
         bundle_dir.mkdir(parents=True, exist_ok=True)
 
         for i, (slide, src_path) in enumerate(

@@ -57,3 +57,9 @@ SYDNEY_TZ = "Australia/Sydney"
 # Set to 168 for initial bootstrap run (7 days of articles)
 # Set back to 48 for daily upkeep runs
 FRESHNESS_HOURS = 48
+
+# Carousel "Approve & Sync" export destination (Decision #52). Point this at
+# a Google Drive / iCloud synced folder so approving a carousel syncs it to
+# phone without a manual copy step. carousel/assembler.py falls back to the
+# local outputs/bundles/ folder if this is left empty.
+CAROUSEL_SYNC_DIR = os.getenv("CAROUSEL_SYNC_DIR", r"G:\My Drive\Anchor & Delta\Outbox")
