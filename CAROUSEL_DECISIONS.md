@@ -611,6 +611,61 @@ parked for v1.5.
 
 ---
 
+## #53 — Cover template archetype for slide-1 hook role
+
+**Date:** 2026-07-06
+**Decision:** A dedicated, bottom-anchored Cover template is selected
+by LayoutPicker for the hook role, replacing the interior-styled Hook
+template for slide 1. Composition: kicker (the card's umbrella_title),
+a provocative headline with an accent-coloured italic emphasis
+fragment, a thin accent rule (max one per slide, Decision #45), a
+curiosity sub-line, a "swipe →" indicator, and the existing domain tag
+and footer chassis retained. The writer prompt is bumped to
+`writer-v1.1` with a cover-copy sub-rule carrying a provocative-but-
+grounded guardrail: punchy phrasing is allowed, but every claim in the
+kicker/headline/sub-line must be directly supported by the card's
+anchor_text or transmission — no fabricated drama, no accusatory
+framing on World/geopolitical content (Decision #17 anti-patterns
+still bind).
+**Why:** Slide 1's job in the feed grid — earn a tap from a stranger
+who has never seen the account — differs from the interior slide's
+job of sustaining swipe-pull once someone is already in the carousel.
+The old Hook template rendered too close to the interior Statement
+slide's visual register to do that job. This is the highest-leverage
+visual change available for follower growth from a scratch account.
+**Alternatives considered:** Background or flag imagery behind the
+headline — rejected on credibility-risk grounds (Decision #27 already
+ruled out photographic/AI-generated imagery for v1.0 on the same
+brand-safety basis). Keeping the centred Statement-style hook —
+rejected, it fails to stop the scroll; it reads as just another
+interior slide.
+**Status:** Active.
+
+---
+
+## #54 — Regenerate-gap fix: kicker preserved and regenerated on Model B cover-slide path
+
+**Date:** 2026-07-06
+**Decision:** `regenerate_slide()` now extracts the existing `kicker`
+from the target slide in the current `CarouselSpec` and passes it as
+context ("current kicker: ...") when the target is the hook/cover
+slot. `regenerate_v1_1.md` (new file; `regenerate_v1_0.md` untouched
+per Decision #08) adds a cover-copy sub-rule matching `writer_v1_1.md`
+exactly — kicker returned unchanged unless the editor's instruction
+asks otherwise, headline ≤2 lines/≤14 words, body carries the
+curiosity sub-line, same provocative-but-grounded guardrail (Decision
+#17 anti-patterns bind). Validation now raises if the model returns
+`kicker: null` for a hook/cover slide, feeding the existing one-retry
+mechanism, instead of silently constructing a slide with a blank
+kicker.
+**Why:** A targeted regenerate of slide 1 was resetting `kicker` to
+`None` (the `Slide(...)` construction in `regenerate_slide()` never
+passed it through), breaking the cover template's most-used edit path
+until the next full-carousel regenerate.
+**Status:** Active.
+
+---
+
 ## Open questions to revisit
 
 - **Anonymous handle name.** Pending account creation.
@@ -641,3 +696,12 @@ parked for v1.5.
   per-carousel `YYYY-MM-DD_domain_slug` subfolders under a configurable
   `CAROUSEL_SYNC_DIR`, resolving the "exact sync-to-folder path" open
   question. Blueprint §5.7 and §12.4 updated.
+- 2026-07-06: Decision #53 added — new Cover template archetype takes
+  over the hook role from the interior-styled Hook template. Writer
+  prompt bumped to `writer-v1.1` (new file, `writer_v1_0.md` untouched
+  per Decision #08) with a cover-copy sub-rule. `Slide.kicker` added as
+  an Optional seam. Blueprint §5.5 and §10 updated.
+- 2026-07-06: Decision #54 added — `regenerate_slide()` (Model B) now
+  preserves and re-validates `kicker` on hook/cover-slide regenerates.
+  New `regenerate_v1_1.md` (`regenerate_v1_0.md` untouched per Decision
+  #08) adds the matching cover-copy sub-rule.

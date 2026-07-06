@@ -22,14 +22,21 @@ from typing import Optional
 import anthropic
 from dotenv import load_dotenv
 
-from carousel.models import CarouselSpec, GenerationMetadata, Slide, SlotPlan, StoryContext
+from carousel.models import (
+    CarouselSpec,
+    GenerationMetadata,
+    Slide,
+    SlotPlan,
+    SlotRole,
+    StoryContext,
+)
 
 load_dotenv()
 
 SONNET_MODEL = "claude-sonnet-4-6"
 MAX_TOKENS = 4000
-PROMPT_PATH = Path(__file__).parent / "prompts" / "writer_v1_0.md"
-REGEN_PROMPT_PATH = Path(__file__).parent / "prompts" / "regenerate_v1_0.md"
+PROMPT_PATH = Path(__file__).parent / "prompts" / "writer_v1_1.md"
+REGEN_PROMPT_PATH = Path(__file__).parent / "prompts" / "regenerate_v1_1.md"
 
 # Sonnet pricing per Blueprint-specified formula (per token, not per 1M).
 INPUT_COST_PER_TOKEN = 0.000003
@@ -157,7 +164,7 @@ def write_carousel(
     context: StoryContext,
     slot_plan: SlotPlan,
     card_id: str,
-    prompt_version: str = "writer-v1.0",
+    prompt_version: str = "writer-v1.1",
 ) -> CarouselSpec:
     """
     Single Sonnet call producing all slide text, caption,
@@ -236,7 +243,7 @@ def regenerate_slide(
     domain: str,
     card_id: str,
     instruction: Optional[str] = None,
-    prompt_version: str = "regenerate-v1.0",
+    prompt_version: str = "regenerate-v1.1",
 ) -> Slide:
     """
     Model B — targeted slide regenerate.
@@ -281,6 +288,12 @@ def regenerate_slide(
         f"current headline: {target.headline}\n"
         f"current body: {target.body}\n"
     )
+    if target.role == SlotRole.hook:
+        # Decision #54 — cover/hook slide's kicker must survive a targeted
+        # regenerate; pass the existing value through as context so the
+        # model returns it (or a deliberate variant) instead of the field
+        # going unset.
+        user_message += f"current kicker: {target.kicker}\n"
     if instruction:
         user_message += f"INSTRUCTION FROM EDITOR: {instruction}\n"
     else:
@@ -316,6 +329,7 @@ def regenerate_slide(
             headline=data["headline"],
             body=data.get("body", ""),
             emphasis_word=data.get("emphasis_word"),
+            kicker=data.get("kicker"),
             quote=data.get("quote"),
             dominant_number=data.get("dominant_number"),
             notes=data.get("notes"),
@@ -324,6 +338,14 @@ def regenerate_slide(
                 (data["headline"] + data.get("body", "")).encode()
             ).hexdigest(),
         )
+        if target.role == SlotRole.hook and not new_slide.kicker:
+            # Decision #54 — a cover/hook slide with kicker=None is a
+            # validation failure, not a silently-accepted result: it
+            # would render with a blank kicker line.
+            raise CarouselWriteError(
+                "Regenerated cover/hook slide is missing a kicker "
+                "(cover slides must not have kicker: null)"
+            )
         cost_usd = (
             response.usage.input_tokens * INPUT_COST_PER_TOKEN
             + response.usage.output_tokens * OUTPUT_COST_PER_TOKEN

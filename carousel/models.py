@@ -203,6 +203,7 @@ class Slide(BaseModel):
     headline: str  # <=8 words for hook, <=14 words otherwise
     body: str = ""  # <=25 words
     emphasis_word: Optional[str] = None  # single word for accent treatment
+    kicker: Optional[str] = None  # Cover template only — umbrella_title-derived line (Decision #53)
     quote: Optional[SourcedQuote] = None  # set when slide IS a quote
     dominant_number: Optional[DominantNumber] = None  # set when slide IS a number
     text_hash: str = ""  # populated by Python after creation, for render cache
@@ -246,14 +247,15 @@ class CarouselSpec(BaseModel):
 
 
 class TemplateID(str, Enum):
-    """The seven v1.0 template archetypes (Blueprint §10)."""
+    """The eight active v1.0 template archetypes (Blueprint §10)."""
 
     statement = "statement"
     number = "number"
     quote = "quote"
     timeline = "timeline"
     concept = "concept"
-    hook = "hook"
+    hook = "hook"  # superseded by `cover` for the hook role in v1.0 (Decision #53); retained, unused
+    cover = "cover"  # slide-1 hook role — bottom-anchored magazine-cover treatment (Decision #53)
     cta = "cta"
     portrait = "portrait"  # SEAM v1.5 — inert in v1.0
 

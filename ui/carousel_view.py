@@ -20,6 +20,21 @@ from db.carousel_queries import update_carousel_status, upsert_carousel
 
 EXPORT_OUTPUT_DIR = Path("outputs") / "bundles"
 
+# Short fixed labels so the "{i+1} · {role}" caption never wraps inside the
+# narrow per-slide card column.
+ROLE_ABBREV = {
+    "hook": "hook",
+    "event": "event",
+    "setup": "setup",
+    "pivot": "pivot",
+    "mechanism": "mech",
+    "concept": "concpt",
+    "contrast": "ctrst",
+    "proof": "proof",
+    "payoff": "payoff",
+    "cta": "cta",
+}
+
 
 def render_carousel_preview(carousel: Carousel) -> None:
     """
@@ -66,25 +81,34 @@ def _render_slide_thumbnails(carousel: Carousel) -> None:
 
     for i, (slide, col) in enumerate(zip(slides, cols)):
         with col:
-            path_str = slide_paths[i] if i < len(slide_paths) else None
-            if path_str and Path(path_str).exists():
-                st.image(path_str, width=270)
-            else:
-                st.markdown(
-                    "<div style='width:270px;height:337px;background:#222;"
-                    "display:flex;align-items:center;justify-content:center;"
-                    f"color:#888;font-size:12px;text-align:center;'>Missing PNG<br>{slide.slot_id}</div>",
-                    unsafe_allow_html=True,
-                )
-            st.caption(slide.slot_id)
-            _render_slide_controls(carousel, i, slide)
+            # Bordered container groups thumbnail + label + controls into
+            # one cohesive per-slide card unit (native primitive, no CSS).
+            with st.container(border=True):
+                path_str = slide_paths[i] if i < len(slide_paths) else None
+                if path_str and Path(path_str).exists():
+                    st.image(path_str, width=270)
+                else:
+                    st.markdown(
+                        "<div style='width:270px;height:337px;background:#222;"
+                        "display:flex;align-items:center;justify-content:center;"
+                        f"color:#888;font-size:12px;text-align:center;'>Missing PNG<br>{slide.slot_id}</div>",
+                        unsafe_allow_html=True,
+                    )
+                st.caption(f"{i + 1} · {ROLE_ABBREV.get(slide.role.value, slide.role.value)}")
+                _render_slide_controls(carousel, i, slide)
+
+    # Edit panel renders full-width below the entire slide row (standard
+    # Streamlit inline-edit pattern, matches the caption editor further
+    # down) rather than inside a narrow per-slide card column.
+    for i, slide in enumerate(slides):
+        if st.session_state.get(f"editing_slide_{carousel.id}_{i}", False):
+            _render_edit_panel(carousel, i, slide)
 
 
 def _render_slide_controls(carousel: Carousel, index: int, slide) -> None:
     edit_key = f"editing_slide_{carousel.id}_{index}"
-    lock_key = f"locked_slide_{carousel.id}_{index}"
 
-    btn_cols = st.columns(3)
+    btn_cols = st.columns(2)
     with btn_cols[0]:
         if st.button("✏️", key=f"edit_btn_{carousel.id}_{index}", help="Edit this slide"):
             st.session_state[edit_key] = not st.session_state.get(edit_key, False)
@@ -166,33 +190,31 @@ def _render_slide_controls(carousel: Carousel, index: int, slide) -> None:
                     st.rerun()
                 except Exception as e:
                     st.error(f"Undo failed: {e}")
-    with btn_cols[2]:
-        locked = st.session_state.setdefault(lock_key, slide.manually_edited)
-        if st.button("🔒" if locked else "🔓", key=f"lock_btn_{carousel.id}_{index}", help="Lock this slide"):
-            st.session_state[lock_key] = not locked
-            st.rerun()
 
-    if st.session_state.get(edit_key, False):
-        # Inline text editor (Model C — no LLM call, $0 cost, Decision #16).
-        new_headline = st.text_input(
-            "Headline", value=slide.headline, key=f"headline_input_{carousel.id}_{index}"
-        )
-        new_body = st.text_area(
-            "Body", value=slide.body, key=f"body_input_{carousel.id}_{index}", height=80
-        )
-        if st.button("💾 Save", key=f"save_slide_{carousel.id}_{index}"):
-            try:
-                _save_slide_edit(
-                    carousel=carousel,
-                    slide_index=index,
-                    new_headline=new_headline,
-                    new_body=new_body,
-                    domain=_infer_domain(carousel),
-                )
-                st.session_state[edit_key] = False
-                st.rerun()
-            except Exception as e:
-                st.error(f"Failed to save slide edit: {e}")
+
+def _render_edit_panel(carousel: Carousel, index: int, slide) -> None:
+    # Inline text editor (Model C — no LLM call, $0 cost, Decision #16).
+    # Rendered full-width below the slide row, not inside its card column.
+    edit_key = f"editing_slide_{carousel.id}_{index}"
+    new_headline = st.text_input(
+        "Headline", value=slide.headline, key=f"headline_input_{carousel.id}_{index}"
+    )
+    new_body = st.text_area(
+        "Body", value=slide.body, key=f"body_input_{carousel.id}_{index}", height=80
+    )
+    if st.button("💾 Save", key=f"save_slide_{carousel.id}_{index}"):
+        try:
+            _save_slide_edit(
+                carousel=carousel,
+                slide_index=index,
+                new_headline=new_headline,
+                new_body=new_body,
+                domain=_infer_domain(carousel),
+            )
+            st.session_state[edit_key] = False
+            st.rerun()
+        except Exception as e:
+            st.error(f"Failed to save slide edit: {e}")
 
 
 def _save_slide_edit(

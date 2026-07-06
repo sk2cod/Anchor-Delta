@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=1080">
+  <link rel="stylesheet" href="base.css">
+  <style>
+    /* accent override — set by caller per domain */
+    .slide { --accent: {{ accent_colour }}; }
+
+    /* Optical-centre composition: content-wrapper's shared top/bottom
+       padding is overridden locally (same pattern statement.html/hook.html
+       use for --measure) so the band's own midpoint sits ~46% from the
+       top of the canvas rather than the shared chassis default (~53%) —
+       poster-balanced, not sunk. justify-content: center (not
+       space-between — DESIGN_LESSONS "space-between breaks short
+       content") keeps the block's optical centre stable at that offset
+       regardless of copy length. Narrow measure forces the same dramatic
+       short-line wrap as the interior hook. */
+    .content-wrapper {
+      --content-top: 200px;
+      --content-bottom: 416px;
+    }
+
+    .content {
+      --measure: 1050px;
+      justify-content: center;
+    }
+
+    .kicker {
+      font-family: var(--font-body);
+      font-weight: 500;
+      font-size: 44px;
+      letter-spacing: 5px;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: var(--gap-md);
+    }
+
+    .headline {
+      font-family: var(--font-display);
+      font-weight: 900;
+      font-size: 180px;
+      line-height: 0.98;
+      color: var(--text-primary);
+      letter-spacing: -2px;
+    }
+
+    .headline .accent {
+      color: var(--accent);
+      font-style: italic;
+      font-weight: 700;
+    }
+
+    .sub-line {
+      font-family: var(--font-body);
+      font-weight: 400;
+      font-size: 56px;
+      line-height: 1.5;
+      color: var(--text-muted);
+      margin-bottom: var(--gap-lg);
+    }
+
+    /* Not part of the centred content group — stays absolutely positioned
+       and outside the content flex container, dropped slightly lower so
+       it clears the sub-line without crowding it, still well above the
+       footer. Calibrated against this template's actual content band
+       (--content-top/--content-bottom above) for the Strait of Hormuz
+       reference render. */
+    .swipe {
+      position: absolute;
+      right: var(--pad-x);
+      top: 1804px;
+      font-family: var(--font-body);
+      font-weight: 500;
+      font-size: 36px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: #8A8078;
+    }
+  </style>
+</head>
+<body>
+<div class="slide">
+  <div class="domain-tag">{{ domain_label }}</div>
+  <div class="content-wrapper">
+    <div class="content">
+      {% if kicker %}<div class="kicker">{{ kicker }}</div>{% endif %}
+      <h1 class="headline">{{ headline_html }}</h1>
+      <div class="rule"></div>
+      {% if sub_line %}<p class="sub-line">{{ sub_line }}</p>{% endif %}
+    </div>
+  </div>
+
+  <div class="swipe">Swipe &rarr;</div>
+
+  <footer class="footer">
+    <span class="page-indicator">{{ page_indicator }}</span>
+    <span class="wordmark">{{ wordmark }}</span>
+  </footer>
+</div>
+</body>
+</html>

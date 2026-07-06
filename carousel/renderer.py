@@ -100,6 +100,10 @@ def _build_variables(enriched_slide: EnrichedSlide, domain_label: str, page_indi
     elif template_id == "hook":
         variables["headline"] = slide.headline
         variables["emphasis_line"] = slide.body
+    elif template_id == "cover":
+        variables["kicker"] = slide.kicker or ""
+        variables["headline_html"] = _build_body_html(slide.headline, slide.emphasis_word)
+        variables["sub_line"] = slide.body
     elif template_id == "number":
         variables["date_label"] = _extract_date_label(slide.body, slide.headline)
         headline = slide.headline

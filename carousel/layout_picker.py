@@ -37,7 +37,7 @@ def _pick_template(slide: Slide) -> TemplateID:
     if slide.role == SlotRole.cta:
         return TemplateID.cta
     if slide.role == SlotRole.hook:
-        return TemplateID.hook
+        return TemplateID.cover  # Decision #53 — cover replaces hook for slide 1
     if slide.quote is not None:
         return TemplateID.quote
     if slide.dominant_number is not None:

@@ -235,7 +235,7 @@ Conditional slots, added in this priority order if their conditions are met:
 **Input:** `CarouselSpec`
 
 **Output:** `EnrichedSpec` — same as `CarouselSpec` but each `Slide` is wrapped in a `LayoutChoice`:
-- `template_id` — enum: `statement` | `number` | `quote` | `timeline` | `concept` | `hook` | `cta` (+ inert `portrait` slot for v1.5)
+- `template_id` — enum: `statement` | `number` | `quote` | `timeline` | `concept` | `hook` | `cover` | `cta` (+ inert `portrait` slot for v1.5)
 - `text_size_class` — literal: `xl` | `l` | `m` | `s` (based on text length)
 - `accent_colour` — hex from domain palette
 - `theme_variant` — literal: `dark` | `light` (default `dark` in v1)
@@ -245,7 +245,7 @@ Conditional slots, added in this priority order if their conditions are met:
 1. **[SEAM v1.5]** If `slide.image_asset` is not None and `slide.role` in {hook, anchor-equivalent} → `portrait` template. In v1.0, `image_asset` is always None, so this rule never fires.
 2. If `slide.quote` is populated → `quote` template
 3. Else if `slide.dominant_number` is populated → `number` template
-4. Else if `slide.role == hook` → `hook` template
+4. Else if `slide.role == hook` → `cover` template (Decision #53 — supersedes the interior-styled `hook` template, which is retained but unused)
 5. Else if `slide.role == event` → `timeline` template
 6. Else if `slide.role in {mechanism, concept}` → `concept` template
 7. Else if `slide.role == cta` → `cta` template
@@ -391,6 +391,7 @@ Slide
 ├── headline: str                         ✅ ≤8 words for hook, ≤14 words otherwise
 ├── body: str                             ✅ ≤25 words
 ├── emphasis_word: Optional[str]          ✅ single word for accent treatment
+├── kicker: Optional[str]                 ✅ Cover template only (Decision #53)
 ├── quote: Optional[SourcedQuote]         ✅ when slide IS a quote
 ├── dominant_number: Optional[Number]     ✅ when slide IS a number
 ├── text_hash: str                        ✅ for render cache
@@ -534,25 +535,26 @@ Thread between slides comes from echoed language, setup-payoff pairs, escalation
 
 ## 10. Template archetypes
 
-Seven templates total. Designed by hand in HTML/CSS during template-design week.
+Eight active templates total. Designed by hand in HTML/CSS during template-design week; `Cover` added post-launch (Decision #53).
 
 | Template ID | Role | Used for | Word density |
 |-------------|------|----------|--------------|
-| **Statement** | Workhorse | Hook (when not number/quote), anchor, pivot, payoff | Medium |
+| **Cover** | Cover | Slide 1 only — bottom-anchored, provocative magazine-cover treatment; stops the scroll in the feed grid (Decision #53) | Very low |
+| **Statement** | Workhorse | anchor, pivot, payoff | Medium |
 | **Number** | Drama | Slides where a single figure carries the point | Low (figure dominates) |
 | **Quote** | Authority | Slides where a sourced quote IS the point | Low (quote dominates) |
 | **Timeline** | Event | Date-stamped delta event chapters | Medium |
 | **Concept** | Framework | Mechanism slides (how something works), Concept slides (a framework) | Medium (text-dense) |
-| **Hook** | Cover | Slide 1 only — visually distinct, signals "start here" | Very low |
+| **Hook** | — | Superseded by Cover for the hook role in v1.0 (Decision #53). Template retained, currently unused. | Very low |
 | **CTA** | Closer | Final slide, fixed copy | Fixed |
 
-**[SEAM v1.5]** An 8th template, `Portrait`, will be added in v1.5 for full-bleed treated portraits of named people. The `Slide.image_asset` field is already in the schema; the LayoutPicker selection rule already exists but never fires in v1.0.
+**[SEAM v1.5]** A further template, `Portrait`, will be added in v1.5 for full-bleed treated portraits of named people — distinct from `Cover`, which is active in v1.0. The `Slide.image_asset` field is already in the schema; the LayoutPicker selection rule already exists but never fires in v1.0.
 
 ### Slot-to-template default mapping
 
 | Slot role | Default template |
 |-----------|------------------|
-| `hook` | Hook |
+| `hook` | Cover (Decision #53) |
 | `setup` | Statement |
 | `event` | Timeline |
 | `pivot` | Statement |
