@@ -781,6 +781,50 @@ out of scope for this fix.
 
 ---
 
+## #57 — Fact sheet replaces single-number proof template
+
+**Date:** 2026-07-07
+**Decision:** The Number template is rebuilt from scratch as a
+multi-figure fact sheet: a writer-generated title above up to 4 rows,
+each row a description (left) and its figure (right), with thin accent
+dividers between rows. `Slide.dominant_number: Optional[DominantNumber]`
+is renamed to `Slide.dominant_numbers: Optional[list[DominantNumber]]`
+(additive/Optional — no schema-version bump, no Supabase migration).
+`Slide.factsheet_title: Optional[str]` added for the creative title.
+`layout_picker.py`'s number-selection rule updated to
+`slide.dominant_numbers is not None and len(slide.dominant_numbers) > 0`.
+Writer bumped to `writer-v1.3` (new file; `writer_v1_2.md` untouched
+per Decision #08): the `## proof` guide now instructs selecting up to 4
+hook-grade figures from `KEY NUMBERS` (dramatic scale, alarming
+dependency, counterintuitive ratio, visceral speed/time/distance;
+routine figures may ride alongside genuinely hook-grade ones but don't
+qualify alone) plus a punchy ≤8-word `factsheet_title`. The old
+single-`dominant_number` instruction is removed entirely.
+**Why:** A single dominant number stops one scroll; multiple hook-grade
+figures together convey cumulative scale — confirmed on the Space
+Force card, where 17,500 mph orbital speed + the 2019 Space Force
+founding + the July 3 intercept date read as a stronger set than any
+one figure alone. A routine figure (e.g. a founding year) earns
+presence alongside dramatic ones without overclaiming on its own.
+**Verification:** ran the full pipeline (`build_context` →
+`plan_carousel` → `write_carousel`) live against the real Space Force
+card. The writer correctly populated `dominant_numbers` (3 real
+figures, each with `value`/`label`/`context` copied from `KEY NUMBERS`)
+and `factsheet_title` ("The numbers behind the orbital race."). Test-
+rendered at 2160×2700 → 1080×1350 with the per-domain accent (ai_tech
+cyan) resolving correctly — no hardcoded domain hex.
+**Note:** `regenerate_slide()` in `writer.py` constructed `Slide(...)`
+with the old `dominant_number=` kwarg — updated to
+`dominant_numbers=`/`factsheet_title=` so the rename doesn't silently
+break Model-B regenerates of the proof slot. `regenerate_v1_1.md`
+itself still describes the old singular field in its output schema and
+was not updated (out of scope for this change) — a proof-slot targeted
+regenerate won't populate the new fields correctly until that prompt is
+separately updated.
+**Status:** Active.
+
+---
+
 ## Open questions to revisit
 
 - **Anonymous handle name.** Pending account creation.
@@ -833,3 +877,10 @@ out of scope for this fix.
   deterministic post-generation guard: a quote slide's attribution must
   match a real card speaker or the generation raises and retries,
   never rendering a fabricated quote.
+- 2026-07-07: Decision #57 added — Number template rebuilt as a
+  multi-figure fact sheet (writer-generated title + up to 4 rows).
+  `Slide.dominant_number` renamed to `Slide.dominant_numbers` (list,
+  Optional, no migration); `Slide.factsheet_title` added. Writer bumped
+  to `writer-v1.3` (new file, `writer_v1_2.md` untouched) selecting up
+  to 4 hook-grade figures per card. Verified end-to-end against the
+  real Space Force card.

@@ -36,7 +36,7 @@ load_dotenv()
 
 SONNET_MODEL = "claude-sonnet-4-6"
 MAX_TOKENS = 4000
-PROMPT_PATH = Path(__file__).parent / "prompts" / "writer_v1_2.md"
+PROMPT_PATH = Path(__file__).parent / "prompts" / "writer_v1_4.md"
 REGEN_PROMPT_PATH = Path(__file__).parent / "prompts" / "regenerate_v1_1.md"
 
 # Sonnet pricing per Blueprint-specified formula (per token, not per 1M).
@@ -201,7 +201,7 @@ def write_carousel(
     context: StoryContext,
     slot_plan: SlotPlan,
     card_id: str,
-    prompt_version: str = "writer-v1.2",
+    prompt_version: str = "writer-v1.4",
 ) -> CarouselSpec:
     """
     Single Sonnet call producing all slide text, caption,
@@ -370,7 +370,8 @@ def regenerate_slide(
             emphasis_word=data.get("emphasis_word"),
             kicker=data.get("kicker"),
             quote=data.get("quote"),
-            dominant_number=data.get("dominant_number"),
+            dominant_numbers=data.get("dominant_numbers"),
+            factsheet_title=data.get("factsheet_title"),
             notes=data.get("notes"),
             manually_edited=False,
             text_hash=hashlib.md5(

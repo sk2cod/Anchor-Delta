@@ -40,8 +40,8 @@ def _pick_template(slide: Slide) -> TemplateID:
         return TemplateID.cover  # Decision #53 — cover replaces hook for slide 1
     if slide.quote is not None:
         return TemplateID.quote
-    if slide.dominant_number is not None:
-        return TemplateID.number
+    if slide.dominant_numbers is not None and len(slide.dominant_numbers) > 0:
+        return TemplateID.number  # fact sheet — up to 4 figures (Decision #57)
     if slide.role == SlotRole.event:
         return TemplateID.timeline
     if slide.role in (SlotRole.mechanism, SlotRole.concept):

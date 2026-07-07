@@ -206,7 +206,8 @@ class Slide(BaseModel):
     emphasis_word: Optional[str] = None  # single word for accent treatment
     kicker: Optional[str] = None  # Cover template only — umbrella_title-derived line (Decision #53)
     quote: Optional[SourcedQuote] = None  # set when slide IS a quote
-    dominant_number: Optional[DominantNumber] = None  # set when slide IS a number
+    dominant_numbers: Optional[list[DominantNumber]] = None  # Fact sheet template — up to 4 figures (Decision #57)
+    factsheet_title: Optional[str] = None  # Fact sheet template only — writer-generated title (Decision #57)
     text_hash: str = ""  # populated by Python after creation, for render cache
     manually_edited: bool = False  # true once user has edited inline (Decision #16)
     # SEAM v1.5 — portrait template support

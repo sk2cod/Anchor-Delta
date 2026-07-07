@@ -33,7 +33,7 @@ RENDER_HEIGHT = 2700
 FINAL_WIDTH = 1080
 FINAL_HEIGHT = 1350
 
-BRAND_VERSION = "1.1"  # bump when CSS changes, to invalidate the render cache
+BRAND_VERSION = "1.9"  # bump when CSS changes, to invalidate the render cache
 WORDMARK = "ANCHOR & DELTA"
 CTA_HANDLE = "@anchordelta"  # placeholder per Decision #29
 
@@ -105,21 +105,20 @@ def _build_variables(enriched_slide: EnrichedSlide, domain_label: str, page_indi
         variables["headline_html"] = _build_body_html(slide.headline, slide.emphasis_word)
         variables["sub_line"] = slide.body
     elif template_id == "number":
-        variables["date_label"] = _extract_date_label(slide.body, slide.headline)
-        headline = slide.headline
-        if not headline and slide.dominant_number:
-            headline = f"{slide.dominant_number.value} {slide.dominant_number.label}"
-        variables["headline"] = headline
-        if slide.dominant_number is not None:
-            variables["number_row_1_label"] = slide.dominant_number.label
-            variables["number_row_1_value"] = slide.dominant_number.value
-            variables["context_label"] = slide.dominant_number.context
-        else:
-            variables["number_row_1_label"] = ""
-            variables["number_row_1_value"] = ""
-            variables["context_label"] = slide.body
-        variables["number_row_2_label"] = ""
-        variables["number_row_2_value"] = ""
+        # Fact sheet (Decision #57) — up to 4 figures, not a single number.
+        # The figure column shows the bare value only — label/context is
+        # the left description column's job, not duplicated here.
+        variables["factsheet_title"] = slide.factsheet_title or ""
+        rows = []
+        for n in (slide.dominant_numbers or [])[:4]:
+            rows.append(
+                {
+                    "value": n.value,
+                    "label": n.label,
+                    "context": n.context,
+                }
+            )
+        variables["dominant_numbers"] = rows
     elif template_id == "quote":
         variables["attribution"] = slide.quote.attribution if slide.quote else ""
         variables["quote_text"] = (
