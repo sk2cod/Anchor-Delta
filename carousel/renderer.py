@@ -122,7 +122,10 @@ def _build_variables(enriched_slide: EnrichedSlide, domain_label: str, page_indi
         variables["number_row_2_value"] = ""
     elif template_id == "quote":
         variables["attribution"] = slide.quote.attribution if slide.quote else ""
-        variables["quote_text"] = slide.quote.text if slide.quote else ""
+        variables["quote_text"] = (
+            _build_body_html(slide.quote.text, slide.emphasis_word) if slide.quote else ""
+        )
+        variables["role"] = slide.quote.role if slide.quote else ""
     elif template_id == "timeline":
         variables["date_label"] = _extract_date_label(slide.body)
         variables["headline"] = slide.headline

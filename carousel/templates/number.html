@@ -9,7 +9,20 @@
     .slide { --accent: {{ accent_colour }}; }
 
     /* Rows need width to let the value sit right of the label. */
-    .content { --measure: 1550px; }
+    .content { --measure: 1550px; justify-content: center; }
+
+    /* Optical-centre composition (same technique as cover.html, kept
+       from this session's fixes): content-wrapper's shared top/bottom
+       padding is overridden locally so the content band's own midpoint
+       sits ~46% from the top of the canvas rather than the shared
+       chassis default (~53%) — the block no longer sits low or left.
+       justify-content: center (not space-between — DESIGN_LESSONS
+       "space-between breaks short content") keeps it stable regardless
+       of copy length. */
+    .content-wrapper {
+      --content-top: 200px;
+      --content-bottom: 416px;
+    }
 
     .date-label {
       font-family: var(--font-body);
@@ -31,17 +44,15 @@
       margin-bottom: 64px;
     }
 
-    .number-rows {
-      display: flex;
-      flex-direction: column;
-      gap: 0;
-    }
-
+    /* Label/value row — the tabular element: unit label left, isolated
+       figure right. justify-content: space-between here is a bounded
+       2-item horizontal spread within one row, not the vertical
+       variable-content anti-pattern DESIGN_LESSONS warns against. */
     .number-row {
       display: flex;
       justify-content: space-between;
       align-items: baseline;
-      padding: 64px 0;   /* opened up from 48px to spread rows down the band */
+      padding: 64px 0;
     }
 
     .number-divider {
@@ -66,13 +77,20 @@
       line-height: 1;
     }
 
+    /* Explanatory body — dominant_number.context, a real explanation,
+       never a duplicate of the figure/headline. Standard muted cream
+       (this session's fix — kept), narrower than the row so it wraps
+       cleanly. */
     .context-label {
       font-family: var(--font-body);
       font-weight: 400;
       font-size: 52px;
-      color: var(--text-muted);
+      color: #8A8078;
       margin-top: 40px;
       line-height: 1.5;
+      max-width: 70%;
+      margin-left: auto;
+      margin-right: auto;
     }
   </style>
 </head>
@@ -84,17 +102,11 @@
       <div class="date-label">{{ date_label }}</div>
       <h1 class="headline">{{ headline }}</h1>
 
-      <div class="number-rows">
-        <div class="number-row">
-          <span class="number-label">{{ number_row_1_label }}</span>
-          <span class="dominant-number">{{ number_row_1_value }}</span>
-        </div>
-        <div class="number-divider"></div>
-        <div class="number-row">
-          <span class="number-label">{{ number_row_2_label }}</span>
-          <span class="dominant-number">{{ number_row_2_value }}</span>
-        </div>
+      <div class="number-row">
+        <span class="number-label">{{ number_row_1_label }}</span>
+        <span class="dominant-number">{{ number_row_1_value }}</span>
       </div>
+      <div class="number-divider"></div>
 
       <p class="context-label">{{ context_label }}</p>
     </div>

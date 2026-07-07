@@ -36,7 +36,10 @@ load_dotenv()
 logger = logging.getLogger(__name__)
 
 HAIKU_MODEL = "claude-haiku-4-5-20251001"
-MAX_EXTRACTION_INPUT_CHARS = 2000
+# Bumped from 2000 (Decision #56) to make room for the dialogue quotes
+# block added to the extraction input below — 2000 was tight enough that
+# appending dialogue risked truncating it straight back out.
+MAX_EXTRACTION_INPUT_CHARS = 3000
 
 EXTRACTION_SYSTEM_PROMPT = """You are a precise information extractor. Extract structured data \
 from the provided news intelligence card. Return only valid JSON. \
@@ -96,6 +99,23 @@ def _build_transmission_summary(card: StoryCard) -> TransmissionSummary:
     return TransmissionSummary(nodes=lines)
 
 
+def _dialogue_lines(card: StoryCard) -> list[str]:
+    """
+    Flatten every delta event's dialogue into "speaker: quote" lines.
+    dialogue is raw JSONB passthrough (Decision #48) with no enforced
+    schema — real rows use "speaker"/"quote" keys, but this stays lenient
+    to "attribution"/"text" too since nothing guarantees the key names.
+    """
+    lines = []
+    for delta in card.delta_events:
+        for entry in delta.dialogue:
+            speaker = entry.get("speaker") or entry.get("attribution")
+            quote = entry.get("quote") or entry.get("text")
+            if speaker and quote:
+                lines.append(f'{speaker}: "{quote}"')
+    return lines
+
+
 def _extraction_input_text(
     card: StoryCard, latest_delta: DeltaSummary, transmission_summary: TransmissionSummary
 ) -> str:
@@ -106,8 +126,22 @@ def _extraction_input_text(
         latest_delta.tldr,
         "\n".join(transmission_summary.nodes),
     ]
-    text = "\n\n".join(p for p in parts if p)
-    return text[:MAX_EXTRACTION_INPUT_CHARS]
+    base_text = "\n\n".join(p for p in parts if p)
+
+    # Decision #56 — dialogue never reached extraction before, so
+    # available_quotes was always empty and the writer fabricated a
+    # "quote" from transmission editorial prose instead. The four inputs
+    # above are unchanged and unreordered; dialogue is a genuinely
+    # additional input. Its budget is reserved off the total BEFORE
+    # truncating the rest, so real sourced quotes always survive
+    # regardless of how long anchor_text/transmission happen to be —
+    # simply appending it and truncating the combined string risked
+    # cutting it straight back out again.
+    dialogue_lines = _dialogue_lines(card)
+    dialogue_block = "\n\nQUOTES:\n" + "\n".join(dialogue_lines) if dialogue_lines else ""
+
+    base_budget = MAX_EXTRACTION_INPUT_CHARS - len(dialogue_block)
+    return base_text[:base_budget] + dialogue_block
 
 
 def _extract_entities_quotes_numbers(

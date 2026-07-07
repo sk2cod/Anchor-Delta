@@ -28,6 +28,7 @@ from carousel.models import (
     Slide,
     SlotPlan,
     SlotRole,
+    SourcedQuote,
     StoryContext,
 )
 
@@ -35,7 +36,7 @@ load_dotenv()
 
 SONNET_MODEL = "claude-sonnet-4-6"
 MAX_TOKENS = 4000
-PROMPT_PATH = Path(__file__).parent / "prompts" / "writer_v1_1.md"
+PROMPT_PATH = Path(__file__).parent / "prompts" / "writer_v1_2.md"
 REGEN_PROMPT_PATH = Path(__file__).parent / "prompts" / "regenerate_v1_1.md"
 
 # Sonnet pricing per Blueprint-specified formula (per token, not per 1M).
@@ -116,12 +117,32 @@ SLOT PLAN (write exactly these slides in this order):
 CARD AGE: {context.card_age_days} days"""
 
 
+def _quote_attribution_matches_card(attribution: str, available_quotes: list[SourcedQuote]) -> bool:
+    """
+    Deterministic check (Decision #03/#56) — a quote's attribution must
+    correspond to a real speaker from the card's own sourced quotes.
+    Matched on name, leniently (case-insensitive substring both ways) so
+    a shortened or fuller form of a real name still matches, but a
+    placeholder like "Article text" or "Editorial conclusion" never
+    accidentally does.
+    """
+    candidate = (attribution or "").strip().lower()
+    if not candidate:
+        return False
+    for q in available_quotes:
+        real = (q.attribution or "").strip().lower()
+        if real and (candidate == real or candidate in real or real in candidate):
+            return True
+    return False
+
+
 def _build_spec_from_response(
     response_text: str,
     card_id: str,
     card_version: str,
     prompt_version: str,
     usage,
+    available_quotes: list[SourcedQuote],
 ) -> CarouselSpec:
     """Parse + validate a writer response into a CarouselSpec. Raises on any failure."""
     data = json.loads(_strip_json_fences(response_text))
@@ -133,6 +154,22 @@ def _build_spec_from_response(
             (slide.headline + slide.body).encode("utf-8")
         ).hexdigest()
         slides.append(slide)
+
+    for slide in slides:
+        if slide.quote is not None and not _quote_attribution_matches_card(
+            slide.quote.attribution, available_quotes
+        ):
+            # Decision #56 — code enforces what the prompt already asked for
+            # (writer_v1_2.md's ## quote guardrail): never render a quote
+            # whose attribution isn't a real, named card speaker. This is
+            # deterministic Python judgment, not LLM self-verification —
+            # same philosophy as the kicker-None guard in regenerate_slide().
+            raise CarouselWriteError(
+                f"Slide {slide.slot_id!r} has a quote attributed to "
+                f"{slide.quote.attribution!r}, which does not match any real "
+                "speaker in this card's sourced quotes — refusing to render "
+                "a fabricated quote."
+            )
 
     cost_usd = (
         usage.input_tokens * INPUT_COST_PER_TOKEN
@@ -164,7 +201,7 @@ def write_carousel(
     context: StoryContext,
     slot_plan: SlotPlan,
     card_id: str,
-    prompt_version: str = "writer-v1.1",
+    prompt_version: str = "writer-v1.2",
 ) -> CarouselSpec:
     """
     Single Sonnet call producing all slide text, caption,
@@ -202,7 +239,8 @@ def write_carousel(
 
     try:
         return _build_spec_from_response(
-            response_text, card_id, card_version, prompt_version, message.usage
+            response_text, card_id, card_version, prompt_version, message.usage,
+            context.available_quotes,
         )
     except Exception as first_error:
         # One automatic retry, with the validation error appended to the prompt.
@@ -229,6 +267,7 @@ def write_carousel(
                 card_version,
                 prompt_version,
                 retry_response.usage,
+                context.available_quotes,
             )
         except Exception as second_error:
             raise CarouselWriteError(

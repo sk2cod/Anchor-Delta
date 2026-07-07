@@ -19,14 +19,60 @@
       justify-content: center;
     }
 
+    /* Explicit z-index on content-wrapper establishes a stacking context
+       so all of its descendants reliably paint above the giant
+       decorative marks below, regardless of their own (unpositioned)
+       stacking. */
+    .content-wrapper { z-index: 2; }
+
+    /* Giant decorative quotation marks — a large low-opacity background
+       flourish, distinct from the small inline marks already bookending
+       .quote-text below. Positioned with clearance from the domain tag
+       (top-left) and footer (bottom-right) so they never collide with
+       actual chassis text. */
+    .quote-mark-open,
+    .quote-mark-close {
+      position: absolute;
+      z-index: 1;
+      font-family: var(--font-display);
+      font-weight: 900;
+      font-size: 180px;
+      line-height: 1;
+      color: var(--accent);
+      opacity: 0.15;
+      pointer-events: none;
+    }
+
+    .quote-mark-open {
+      top: calc(var(--pad-y) + 100px);
+      left: var(--pad-x);
+    }
+
+    .quote-mark-close {
+      bottom: calc(var(--pad-y) + 180px);
+      right: var(--pad-x);
+    }
+
+    /* Name — prominent, standard cream. */
     .attribution {
       font-family: var(--font-body);
       font-weight: 500;
       font-size: 32px;
       letter-spacing: 2px;
       text-transform: uppercase;
-      color: var(--text-footer);
-      margin-bottom: 48px;
+      color: var(--text-primary);
+      margin-bottom: 8px;
+    }
+
+    /* Role — supporting, standard muted. Distinct level from the name
+       above it: smaller, lighter weight, dimmer colour. */
+    .quote-role {
+      font-family: var(--font-body);
+      font-weight: 400;
+      font-size: 28px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: #8A8078;
     }
 
     .quote-text {
@@ -48,15 +94,23 @@
       content: '\201D';
       color: var(--accent);
     }
+
+    .quote-text .accent {
+      color: var(--accent);
+    }
   </style>
 </head>
 <body>
 <div class="slide">
   <div class="domain-tag">{{ domain_label }}</div>
+  <div class="quote-mark-open">&ldquo;</div>
+  <div class="quote-mark-close">&rdquo;</div>
   <div class="content-wrapper">
     <div class="content">
-      <div class="attribution">{{ attribution }}</div>
       <p class="quote-text">{{ quote_text }}</p>
+      <div class="rule"></div>
+      <div class="attribution">{{ attribution }}</div>
+      {% if role %}<div class="quote-role">{{ role }}</div>{% endif %}
     </div>
   </div>
 

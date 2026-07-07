@@ -157,6 +157,7 @@ class SlotRole(str, Enum):
     mechanism = "mechanism"
     concept = "concept"
     proof = "proof"
+    quote = "quote"  # dedicated quote slot — Decision #55
     contrast = "contrast"
     payoff = "payoff"
     cta = "cta"

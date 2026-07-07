@@ -666,6 +666,121 @@ until the next full-carousel regenerate.
 
 ---
 
+## #55 — Quote slot as dedicated 9th slide when both dominant number and strong quote present
+
+**Date:** 2026-07-06
+**Decision:** A dedicated `quote` slot is added to `planner.py`,
+inserted immediately after `proof` and before `contrast`/`payoff` in
+`SLOT_ORDER`. It fires only when `dominant_numbers` AND
+`available_quotes` are BOTH non-empty simultaneously — never for
+either alone, since `proof` already handles the number-only case.
+When it fires, the per-carousel cap resolves to 9 slots (a local
+`max_slots` variable in `plan_carousel()`, not a change to the global
+`MAX_SLOTS = 8` constant); otherwise the cap stays 8. `DROP_PRIORITY`
+is extended with `quote` last — most protected of all optional slots.
+`quote` is `is_optional: True`. Writer prompt bumped to `writer-v1.2`
+(new file; `writer_v1_1.md` untouched per Decision #08) with a
+dedicated `## quote` slot guide: select the single strongest sourced
+quote from `available_quotes`, populate `Slide.quote` as a structured
+`{text, attribution, role}` object, headline = attribution name only,
+body = empty, emphasis_word = the quote's strongest word or null.
+Hard guardrail: the quote must be copied verbatim from
+`available_quotes` — never fabricated or paraphrased; if no quote is
+strong enough to stand alone, the slot falls back to a Statement-style
+slide with `quote: null`. A parallel `## proof` guide clarifies proof
+always takes the number and never populates `quote`. `SlotRole.quote`
+added to the enum in `models.py` (the only place `SlotRole` is
+defined). The Number template gets a ghost-number treatment (same
+value, ~260px Playfair 900, accent colour at 7% opacity, centred
+behind the foreground content via an explicit `z-index` stacking
+context). The Quote template gets oversized decorative quotation marks
+(~180px Playfair 900, accent colour at 15% opacity, top-left/
+bottom-right, clear of the domain tag and footer) plus a `role` line
+under the attribution and correct emphasis-word treatment on the quote
+text — `renderer.py`'s existing `quote` dispatch branch was missing
+both, extended in the same pattern as the `cover` branch (Decision
+#53).
+**Why:** The diagnostic pass confirmed all downstream components
+(assembler, renderer, writer, UI) are already slide-count agnostic —
+the only structural blocker to a 9th slide was `planner.py`'s hard
+cap. Separately, quote content was being buried in body prose with no
+dedicated slot or visual treatment, and no writer instruction ever
+populated the structured `quote` field, so the existing Quote template
+never fired. A direct, high-authority attribution is stronger
+follower-growth content than a generic contrast slide when the card
+actually has one.
+**Note:** Because `quote`'s condition is a strict superset of
+`proof`'s (both require `dominant_numbers` non-empty), and `proof` is
+first/least-protected in `DROP_PRIORITY` while `quote` is
+last/most-protected, a cap-overflow carousel can in principle drop
+`proof` while `quote` survives — a quote slide without a corresponding
+number slide in the same carousel. This follows the literal spec as
+given; flagging it as worth confirming is intentional, not a defect.
+**Status:** Active.
+
+---
+
+## #56 — Real quotes reach extraction + deterministic anti-fabrication guard
+
+**Date:** 2026-07-07
+**Root cause:** `context_builder.py`'s `_extraction_input_text()` built
+the Haiku quote/entity/number extraction input from only
+`umbrella_title + anchor_text + latest_delta.headline/tldr +
+transmission_summary.nodes` — it never read `delta_events[*].dialogue`,
+and `DeltaSummary` (what `latest_delta` actually is) drops dialogue
+before extraction even sees it. Confirmed on the Canada/Alberta
+pipeline card: `available_quotes` was empty despite the card
+containing four real sourced quotes (Carney, Smith, Eby, Slett) in
+`dialogue`. With no real quotes available, the writer fabricated a
+"quote" by lifting the transmission's editorial *"so what"* prose
+verbatim and self-labelling it `attribution: "Article text"`,
+`role: "Editorial conclusion"` — `writer_v1_2.md`'s existing `## quote`
+guardrail (verbatim-from-`AVAILABLE QUOTES`, never fabricate, fall back
+to a Statement slide otherwise) was correct and unchanged; it was
+simply ignored by the model.
+**Fix 1 (`context_builder.py`):** `delta_events[*].dialogue` is
+flattened into `"speaker: quote"` lines and appended as a genuinely
+additional `QUOTES:` block to the extraction input — the four existing
+inputs are untouched and unreordered. Its budget is reserved off the
+total *before* truncating the rest (not simply appended-then-truncated)
+so real quotes survive regardless of how long `anchor_text`/
+transmission happen to be; `MAX_EXTRACTION_INPUT_CHARS` raised
+2000 → 3000 for headroom. Verified against the real Canada/Alberta
+card: `available_quotes` now returns all four quotes with correct
+`attribution`/`role` (e.g. `text="Move faster, build bigger and work
+together.", attribution="Mark Carney", role="Canada's Prime
+Minister"`).
+**Fix 2 (`writer.py`):** a deterministic Python guard,
+`_quote_attribution_matches_card()`, runs inside
+`_build_spec_from_response()` after every full-carousel generation.
+For any slide with a populated `Slide.quote`, its `attribution` must
+match (case-insensitive, substring-tolerant) a real speaker in
+`context.available_quotes`; if not, it raises — feeding the *existing*
+one-retry-with-error-feedback mechanism already used for every other
+writer validation failure, same philosophy as the kicker-`None` guard
+in `regenerate_slide()` (Decision #54). Verified with a mocked client:
+persistent fabrication across both attempts raises a clear
+`CarouselWriteError` (the fabricated quote is never rendered); a
+fabricated first attempt corrected by a real quote on retry succeeds
+normally; a real quote on the first attempt passes straight through.
+**Why code, not the LLM:** Decision #03 — Python owns determinism. The
+model already had an explicit, correct guardrail in the prompt and
+ignored it; asking it to self-verify its own fabrication would be
+circular. The judgment (does this attribution match a real card
+speaker?) is now a deterministic string check with zero LLM
+involvement — only the retry's replacement *content* still comes from
+the model, exactly as for every other validation failure in this file.
+**Scope note:** this guard is wired into `write_carousel()`'s
+full-carousel path only, where `context.available_quotes` is already
+available. `regenerate_slide()` (Model B) has no access to the card's
+real quotes at all today (no `StoryContext`/card data is threaded
+through it) — extending the same guard there would require adding new
+parameters and updating its caller in `ui/carousel_view.py`, which is
+out of scope for this fix.
+**Status:** Active.
+
+---
+
 ## Open questions to revisit
 
 - **Anonymous handle name.** Pending account creation.
@@ -705,3 +820,16 @@ until the next full-carousel regenerate.
   preserves and re-validates `kicker` on hook/cover-slide regenerates.
   New `regenerate_v1_1.md` (`regenerate_v1_0.md` untouched per Decision
   #08) adds the matching cover-copy sub-rule.
+- 2026-07-06: Decision #55 added — dedicated `quote` slot in
+  `planner.py` (fires only when both a dominant number and a strong
+  quote exist; 9-slot cap for that carousel only). Writer bumped to
+  `writer-v1.2` (new file, `writer_v1_1.md` untouched) with `## quote`
+  and `## proof` slot guides. Number template gets a ghost-number
+  treatment; Quote template gets oversized decorative marks, a `role`
+  line, and correct emphasis-word rendering.
+- 2026-07-07: Decision #56 added — `context_builder.py` now feeds
+  `delta_events[*].dialogue` into quote extraction (was never read
+  before, so `available_quotes` was always empty). `writer.py` adds a
+  deterministic post-generation guard: a quote slide's attribution must
+  match a real card speaker or the generation raises and retries,
+  never rendering a fabricated quote.
