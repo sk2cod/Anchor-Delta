@@ -37,7 +37,7 @@ load_dotenv()
 SONNET_MODEL = "claude-sonnet-4-6"
 MAX_TOKENS = 4000
 PROMPT_PATH = Path(__file__).parent / "prompts" / "writer_v1_5.md"
-REGEN_PROMPT_PATH = Path(__file__).parent / "prompts" / "regenerate_v1_1.md"
+REGEN_PROMPT_PATH = Path(__file__).parent / "prompts" / "regenerate_v1_2.md"
 
 # Sonnet pricing per Blueprint-specified formula (per token, not per 1M).
 INPUT_COST_PER_TOKEN = 0.000003
@@ -282,7 +282,7 @@ def regenerate_slide(
     domain: str,
     card_id: str,
     instruction: Optional[str] = None,
-    prompt_version: str = "regenerate-v1.1",
+    prompt_version: str = "regenerate-v1.2",
 ) -> Slide:
     """
     Model B — targeted slide regenerate.
@@ -333,6 +333,19 @@ def regenerate_slide(
         # model returns it (or a deliberate variant) instead of the field
         # going unset.
         user_message += f"current kicker: {target.kicker}\n"
+    if target.role == SlotRole.quote:
+        # Decision #63 — same pattern as the kicker fix above. This is
+        # also the only real, already-validated quote available here:
+        # regenerate_slide() has no access to the full StoryContext (only
+        # spec, at the UI call site), so target.quote — which already
+        # passed the Decision #56 anti-fabrication guard when the
+        # carousel was first generated — is the anti-fabrication ground
+        # truth for this regenerate, not a fresh available_quotes list.
+        if target.quote is not None:
+            user_message += (
+                f'current quote: "{target.quote.text}" '
+                f"— {target.quote.attribution} ({target.quote.role})\n"
+            )
     if instruction:
         user_message += f"INSTRUCTION FROM EDITOR: {instruction}\n"
     else:
@@ -386,6 +399,29 @@ def regenerate_slide(
                 "Regenerated cover/hook slide is missing a kicker "
                 "(cover slides must not have kicker: null)"
             )
+        if target.role == SlotRole.quote:
+            # Decision #63 — same pattern as the kicker-None guard above,
+            # plus the Decision #56 anti-fabrication check. A quote-role
+            # slide with quote=None is a validation failure (it would
+            # render with no quote at all). The attribution check reuses
+            # target.quote — the only real, already-validated quote this
+            # function has access to (see the context-building comment
+            # above) — as the anti-fabrication ground truth, exactly the
+            # same deterministic-Python-judgment philosophy as
+            # _build_spec_from_response()'s check on the full writer path.
+            if new_slide.quote is None:
+                raise CarouselWriteError(
+                    "Regenerated quote slide is missing a quote "
+                    "(quote slides must not have quote: null)"
+                )
+            known_quotes = [target.quote] if target.quote is not None else []
+            if not _quote_attribution_matches_card(new_slide.quote.attribution, known_quotes):
+                raise CarouselWriteError(
+                    f"Regenerated quote is attributed to "
+                    f"{new_slide.quote.attribution!r}, which does not match "
+                    "the real speaker already on this card — refusing to "
+                    "render a fabricated quote."
+                )
         cost_usd = (
             response.usage.input_tokens * INPUT_COST_PER_TOKEN
             + response.usage.output_tokens * OUTPUT_COST_PER_TOKEN

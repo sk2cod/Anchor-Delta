@@ -1016,6 +1016,56 @@ mechanism drops first, then contrast, concept last (most protected).
 
 ---
 
+## #63 — Regenerate-gap fix for quote slot (Model B)
+
+**Date:** 2026-07-08
+**The gap:** `regenerate_slide()` (Model B — targeted single-slide
+regenerate) never passed `Slide.quote` through when rebuilding a
+quote-role slide, and never validated the result. A targeted
+regenerate of the quote slide silently reset `Slide.quote` to null —
+the same class of bug as Decision #54's cover/kicker gap, just for the
+quote slot instead.
+**The fix:** Same pattern as Decision #54. `regenerate_slide()` now:
+passes the slide's existing `Slide.quote` (text/attribution/role)
+through as `current quote:` context in the user message when
+`target.role == SlotRole.quote`, mirroring the existing `current
+kicker:` line; raises `CarouselWriteError` if the regenerated slide
+comes back with `quote: null` on a quote-role slide (same validation
+pattern as the kicker-None guard), feeding the existing one-retry
+mechanism rather than crashing hard; and re-validates the returned
+quote's attribution with the existing `_quote_attribution_matches_card()`
+helper (Decision #56) before accepting it.
+**Anti-fabrication note:** `regenerate_slide()` has no access to the
+full `StoryContext` — only `CarouselSpec` is available at the UI call
+site (`ui/carousel_view.py`, untouched). So the anti-fabrication check
+validates the regenerated quote's attribution against the slide's own
+existing `target.quote` — the only real, already-validated quote
+available here, itself already having passed the Decision #56 guard
+when the carousel was first generated — rather than against a fresh
+`available_quotes` list. If `target.quote` is also `None` (the slide
+was already broken by this exact bug before the fix), there is nothing
+real to validate against and the regenerate fails validation rather
+than accepting an unverifiable quote.
+**New prompt:** `carousel/prompts/regenerate_v1_2.md` created (copy of
+`regenerate_v1_1.md`, which is untouched — Decision #08). Adds a
+"Quote sub-rule" section mirroring `writer_v1_5.md`'s `## quote` guide:
+attribution/role must match the given current quote exactly (they are
+facts, not something a regenerate can change); text may be tightened
+for punch but must stay a faithful rendering, never a paraphrase into
+a different meaning; quote must never be null; and — unlike the main
+writer's quote guide — there is no Statement-slide fallback here,
+since a quote-role slide's `role` field is fixed by `regenerate_slide()`
+and can't switch roles mid-regenerate. `carousel/writer.py`:
+`REGEN_PROMPT_PATH` → `regenerate_v1_2.md`, default `prompt_version`
+→ `"regenerate-v1.2"`.
+**Verified:** ran `regenerate_slide()` against a synthetic quote-role
+slide with a real quote (Shunyu Yao / Tencent) — the returned
+`Slide.quote` preserved the exact attribution and role, confirming the
+gap no longer resets the field to null.
+**Status:** Active.
+
+---
+
 ## Open questions to revisit
 
 - **Anonymous handle name.** Pending account creation.
@@ -1095,3 +1145,7 @@ mechanism drops first, then contrast, concept last (most protected).
 - 2026-07-08: Decision #62 added — `planner.py`'s `DROP_PRIORITY`
   reordered to `(mechanism, contrast, concept)`; concept is now the
   most protected structural slot, mechanism the most droppable.
+- 2026-07-08: Decision #63 added — regenerate-gap fix for the quote
+  slot (Model B), same pattern as Decision #54's kicker fix. New
+  `regenerate_v1_2.md` (`regenerate_v1_1.md` untouched); `writer.py`
+  passes/validates `Slide.quote` on regenerate instead of losing it.
