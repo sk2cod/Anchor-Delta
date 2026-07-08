@@ -36,10 +36,15 @@ load_dotenv()
 logger = logging.getLogger(__name__)
 
 HAIKU_MODEL = "claude-haiku-4-5-20251001"
-# Bumped from 2000 (Decision #56) to make room for the dialogue quotes
-# block added to the extraction input below — 2000 was tight enough that
-# appending dialogue risked truncating it straight back out.
-MAX_EXTRACTION_INPUT_CHARS = 3000
+# Bumped 2000 (pre-Decision #56) -> 3000 (Decision #56, dialogue quotes
+# block) -> 10000 (Decision #59, full transmission body for number
+# extraction). A real transmission body alone can run ~6-7k characters
+# across 3-5 nodes; reserved blocks are never truncated regardless of
+# this cap (see _extraction_input_text), but a cap this tight would
+# starve the base context (title/anchor/headline/tldr) down to nothing
+# whenever a reserved block is large — cheap to avoid, since Haiku input
+# tokens cost $0.80/1M and this call's whole budget is ~$0.005.
+MAX_EXTRACTION_INPUT_CHARS = 10000
 
 EXTRACTION_SYSTEM_PROMPT = """You are a precise information extractor. Extract structured data \
 from the provided news intelligence card. Return only valid JSON. \
@@ -140,8 +145,27 @@ def _extraction_input_text(
     dialogue_lines = _dialogue_lines(card)
     dialogue_block = "\n\nQUOTES:\n" + "\n".join(dialogue_lines) if dialogue_lines else ""
 
-    base_budget = MAX_EXTRACTION_INPUT_CHARS - len(dialogue_block)
-    return base_text[:base_budget] + dialogue_block
+    # Decision #59 — same structural pattern as Decision #56, this time
+    # for numbers. _build_transmission_summary()'s 6-line truncation
+    # (used above in transmission_summary, and left untouched — it's
+    # correct for writer context/slot planning) only ever reaches the
+    # first node or so. But the Intelligence Engine's Voice Rule 5
+    # mandates "specific numbers" in the body prose of EVERY node, and
+    # "so what" lines are one-sentence editorial conclusions, not data
+    # carriers — so hook-grade numbers routinely live in nodes 2-4,
+    # past that 6-line cutoff, and were silently never reaching Haiku.
+    # The full raw transmission body is reserved here, in full, as its
+    # own block — never truncated by MAX_EXTRACTION_INPUT_CHARS below,
+    # exactly like the dialogue block above.
+    numbers_block = (
+        "\n\nTRANSMISSION NUMBERS:\n" + card.transmission.nodes_markdown
+        if card.transmission and card.transmission.nodes_markdown
+        else ""
+    )
+
+    reserved = len(dialogue_block) + len(numbers_block)
+    base_budget = max(0, MAX_EXTRACTION_INPUT_CHARS - reserved)
+    return base_text[:base_budget] + numbers_block + dialogue_block
 
 
 def _extract_entities_quotes_numbers(
@@ -151,7 +175,14 @@ def _extract_entities_quotes_numbers(
     try:
         message = client.messages.create(
             model=HAIKU_MODEL,
-            max_tokens=1024,
+            # Decision #59 — 1024 was enough for the old ~2-3k char input
+            # (6-line transmission summary), but the full transmission
+            # body now regularly pushes the input past 9k characters,
+            # so Haiku has proportionally more quotes/entities/numbers to
+            # report. 1024 was cutting the JSON off mid-string, failing
+            # to parse and silently falling back to empty lists for
+            # everything — worse than before, not just for numbers.
+            max_tokens=4096,
             system=EXTRACTION_SYSTEM_PROMPT,
             messages=[{"role": "user", "content": text}],
         )

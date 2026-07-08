@@ -825,6 +825,197 @@ separately updated.
 
 ---
 
+## #58 — Domain-aware hook-grade examples in writer prompt — all three domains
+
+**Date:** 2026-07-08
+**Problem:** The `## proof` slot's hook-grade definition (Decision #57)
+was a single universal bar — "dramatic scale, alarming dependency,
+counterintuitive ratio, or visceral speed/time/distance" — that reads
+naturally for World/geopolitical content but was quietly biased toward
+it. Finance cards with genuinely hook-grade numbers (yield curve
+inversions, debt-to-GDP extremes, rate-decision persistence) and
+AI&Tech cards (hallucination-rate drops, parameter efficiency ratios,
+named-competitor benchmark differentials) were being passed over
+because none of them read as "visceral scale" the way a military speed
+or a chokepoint percentage does — even though they're exactly as
+significant to their own technically-literate audience.
+**Fix:** Added a `DOMAIN-SPECIFIC HOOK-GRADE EXAMPLES` section to
+`writer_v1_5.md` (new file; `writer_v1_4.md` untouched per Decision
+#08), inserted immediately after the existing universal hook-grade
+definition — which stays intact and unchanged. Three domain blocks,
+each with its own hook-grade bar, GOOD examples, and an explicit
+NOT-hook-grade list: World/geopolitical (chokepoint percentages,
+diplomatic deadlines, military speeds/distances), Finance/
+macroeconomics (yield curves, debt ratios, rate-decision history,
+currency extremes, market-cap comparisons — using the Canada pipeline's
+C$150B investment and 97% US export dependency as canonical examples),
+and AI & Tech (hallucination/error-rate changes, parameter efficiency,
+named-competitor benchmark differentials, hardware efficiency — using
+Tencent Hy3's hallucination-rate drop from 12.5% to 5.4% as the
+canonical example, with an explicit ALWAYS-include instruction when
+that kind of data is present). A closing CRITICAL RULE explicitly
+forbids applying the World visceral-scale bar or the Finance yield/rate
+bar to AI&Tech numbers, and vice versa.
+**Why:** Each domain has its own technically-literate audience with its
+own sense of what's alarming or surprising — a macro trader finds a
+190bps sovereign spread hook-grade; a general reader would not, and
+wouldn't need to. A universal visceral-scale bar systematically
+under-selects for Finance and AI&Tech cards, leaving their fact sheet
+slides thinner (or entirely proof-less) even when the underlying card
+has strong, genuinely hook-grade numbers available.
+**Status:** Active.
+
+---
+
+## #59 — Transmission truncation bug drops hook-grade numbers from later nodes — dedicated full-transmission number extraction pass added
+
+**Date:** 2026-07-08
+**Root cause:** `_build_transmission_summary()`'s 6-line truncation
+heuristic (used to build `transmission_summary.nodes` for writer
+context and slot planning — correct for that purpose, left untouched)
+only ever reaches roughly the first node of a transmission before the
+line cap is exhausted. Confirmed via `pipeline/engine.py`'s
+`COMPOSE_NEW_CARD_SYSTEM_PROMPT`: "The so what:" lines are explicitly
+scoped as one-sentence editorial conclusions ("why this matters right
+now"), not data carriers — nothing instructs the composer to put
+numbers there. The actual numbers-bearing content is the node body
+prose, per Voice Rule 5 ("the reader needs... the specific numbers...
+give them everything"), which applies to **every** node, not just the
+first. Confirmed directly on the real Tencent Hy3 card
+(`e0670639-b34f-4a40-a1bf-27537a190fbb`): its hallucination-rate
+figures (12.5% → 5.4%) live in Node 4 of 4, entirely past the 6-line
+cutoff — `context.dominant_numbers` was empty before this fix. Same
+structural pattern as Decision #56's dialogue-truncation bug.
+**Fix:** `_extraction_input_text()` in `context_builder.py` adds a
+`TRANSMISSION NUMBERS:` block built from the full raw
+`card.transmission.nodes_markdown` (all nodes, untruncated) — reserved
+in full and appended after truncating the rest of the input, exactly
+like the Decision #56 dialogue block, so it can never be silently cut
+by the length cap. `_build_transmission_summary()` and the existing
+quote/entity extraction logic are untouched. `MAX_EXTRACTION_INPUT_CHARS`
+raised 3000 → 10000 (a real transmission body alone runs ~6-7k
+characters; a tighter cap would starve the base context — title/
+anchor/headline/tldr — down to nothing whenever a reserved block is
+large, which is now the common case, not the exception). Also raised
+`max_tokens` on the Haiku extraction call 1024 → 4096: the fuller input
+gave Haiku proportionally more to report, and 1024 was cutting the
+JSON response off mid-string, failing to parse and silently falling
+back to empty lists for quotes/entities/numbers alike — a direct,
+necessary side effect of feeding Haiku more material that had to be
+fixed for the primary fix to actually work.
+**Why the full-transmission-body fix over a higher line cap or
+targeting "so what" lines:** a higher line cap is still an arbitrary
+heuristic that breaks again on a long enough transmission — line count
+doesn't map cleanly to node boundaries. "So what" lines are explicitly
+not designed to carry data per the composer prompt itself. The full
+transmission body is the only source that's structurally guaranteed to
+contain every node's numbers, because Voice Rule 5 mandates specific
+numbers in the body prose of every node, not any one section.
+**Verified end-to-end** against the real Tencent Hy3 card:
+`context.dominant_numbers` now returns 15 figures spanning all 4
+nodes — including `value='12.5%', label='Hy3 hallucination rate in
+April preview'` and `value='5.4%', label='Hy3 hallucination rate in
+full release'`. `available_quotes` and `key_entities` (16 entities)
+confirmed still populated correctly — no regression from the larger
+input.
+**Status:** Active.
+
+---
+
+## #60 — Proof and quote slots are purely additive — cap raises dynamically to 9 or 10, never drops these slots
+
+**Date:** 2026-07-08
+**Problem:** `proof` was first in `DROP_PRIORITY` — the very slot that
+exists because the card has genuine data was the *first* one sacrificed
+whenever a card was rich enough to fill the base 8 slots. Worse: the
+9-slide expansion only fired when the `quote` slot was present, so a
+card with both `dominant_numbers` and a strong quote would expand to 9,
+then `proof` (still first in `DROP_PRIORITY`) got dropped to bring the
+count back down — leaving `quote` alone and defeating the entire point
+of having both.
+**Fix:** `proof` and `quote` removed from `DROP_PRIORITY` entirely —
+`carousel/planner.py`'s `DROP_PRIORITY` is now `(concept, mechanism,
+contrast)` only. The cap is no longer a single fixed 8/9 branch; it
+resolves dynamically in `plan_carousel()`: `effective_cap = MAX_SLOTS
+(8) + 1 if proof present + 1 if quote present` — 8 baseline, 9 for
+either alone, 10 for both. Verified against four scenarios:
+- No numbers, no quotes → 8 slides, neither proof nor quote, concept/contrast intact
+- Numbers only → 9 slides, proof added, nothing else dropped
+- Both numbers and quotes → 10 slides, both proof and quote added, nothing else dropped
+- Quotes only, no numbers → did NOT produce a quote slot as might be
+  assumed from the label alone — this task's scope was the cap/drop
+  logic only, not the quote slot's firing condition. `quote` still
+  requires `dominant_numbers` non-empty AND `available_quotes`
+  non-empty simultaneously (Decision #55's deliberate, narrower-than-
+  proof condition, left untouched) — a quote-only card with zero
+  dominant_numbers produces 8 slides with neither, identical to the
+  no-numbers-no-quotes case. Flagged, not silently changed.
+**Why:** Proof and quote are evidence slots — they exist only because
+the card has genuine data to show. Dropping evidence to preserve a
+fixed structural slot budget was backwards; the cap should expand to
+serve content that's actually present, not constrain it down to fit an
+arbitrary count. `concept`/`mechanism`/`contrast` remain droppable
+because they're structural/interpretive additions, not evidence.
+**Status:** Active.
+
+---
+
+## #61 — Quote slot fires independently of dominant numbers
+
+**Date:** 2026-07-08
+**Why they were originally clubbed:** Decision #55 required BOTH
+`dominant_numbers` AND `available_quotes` non-empty before `quote`
+would fire. The reasoning at the time was that quote was conceived as
+paired with proof — a number-plus-quote combination slide, treated as
+a variant of "the card has hard evidence" rather than a slot in its
+own right.
+**Why this was wrong:** A strong sourced quote is standalone evidence
+on its own merits — a named speaker saying something sharp doesn't
+need a number sitting next to it to justify a slide. The
+anti-fabrication guard (Decision #56) already does the real work of
+keeping weak or unsourced quotes out of `available_quotes` in the
+first place, so gating `quote` on `dominant_numbers` too was a second,
+redundant guard — one that actively hurt content quality by burying
+genuinely strong quotes back into body prose on cards that had a great
+quote but no notable number.
+**Fix:** `carousel/planner.py`'s quote condition changed from
+`len(context.dominant_numbers) > 0 and len(context.available_quotes) > 0`
+to `len(context.available_quotes) > 0` — one line. Proof and quote are
+now fully independent; `effective_cap` (Decision #60) already handles
+the dynamic 8/9/9/10 cap correctly with no further changes needed.
+Verified all four scenarios:
+- No numbers, no quotes → 8 slides, neither proof nor quote
+- Numbers only → 9 slides, proof present, no quote
+- Quotes only, no numbers → 9 slides, quote present, no proof
+- Both → 10 slides, proof and quote both present
+**Status:** Active.
+
+---
+
+## #62 — DROP_PRIORITY reordered — concept protected above mechanism and contrast
+
+**Date:** 2026-07-08
+**Why:** Concept is the educational backbone of AI&Tech and Finance
+cards — it's the slot that explains open-weight models, MoE
+architecture, Apache 2.0 licensing, yield curves, and similar concepts
+the reader needs before the rest of the card lands. Dropping it first
+loses the explanatory layer that makes content valuable to a
+technically-literate audience, which is exactly the audience Decision
+#58's domain-specific hook-grade work was written for. Mechanism is
+the most replaceable of the three: its content (the "because"/"this is
+why" causal explanation) frequently already gets covered inside
+concept's own explanation when both would otherwise fire. Contrast is
+structural rather than explanatory — payoff already covers similar
+ground (the resolution/consequence) if a contrast beat has to go.
+**Fix:** `carousel/planner.py`'s `DROP_PRIORITY` reordered from
+`(concept, mechanism, contrast)` to `(mechanism, contrast, concept)` —
+mechanism drops first, then contrast, concept last (most protected).
+`proof` and `quote` remain absent from `DROP_PRIORITY` entirely
+(Decision #60, confirmed still in place).
+**Status:** Active.
+
+---
+
 ## Open questions to revisit
 
 - **Anonymous handle name.** Pending account creation.
@@ -884,3 +1075,23 @@ separately updated.
   to `writer-v1.3` (new file, `writer_v1_2.md` untouched) selecting up
   to 4 hook-grade figures per card. Verified end-to-end against the
   real Space Force card.
+- 2026-07-08: Decision #58 added — writer bumped to `writer-v1.5`
+  (new file, `writer_v1_4.md` untouched) with domain-specific
+  hook-grade examples for World, Finance, and AI & Tech, so the fact
+  sheet's number selection stops applying a World-biased
+  visceral-scale bar to Finance and AI&Tech cards.
+- 2026-07-08: Decision #59 added — `context_builder.py` now feeds the
+  full raw transmission body into number extraction (was truncated to
+  6 lines, dropping numbers from nodes 2-4). Same reserved-block
+  pattern as Decision #56's dialogue fix. `MAX_EXTRACTION_INPUT_CHARS`
+  3000 → 10000, Haiku extraction `max_tokens` 1024 → 4096.
+- 2026-07-08: Decision #60 added — `proof`/`quote` removed from
+  `planner.py`'s `DROP_PRIORITY`; cap now resolves dynamically
+  (8/9/9/10) instead of a fixed 8/9 branch, so evidence slots are
+  never sacrificed to make room for structural ones.
+- 2026-07-08: Decision #61 added — `planner.py`'s `quote` condition no
+  longer requires `dominant_numbers` too; fires on `available_quotes`
+  alone. All four cap scenarios (8/9/9/10) now match spec exactly.
+- 2026-07-08: Decision #62 added — `planner.py`'s `DROP_PRIORITY`
+  reordered to `(mechanism, contrast, concept)`; concept is now the
+  most protected structural slot, mechanism the most droppable.

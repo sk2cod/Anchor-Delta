@@ -21,16 +21,15 @@ FIXED_SLOT_ROLES = (SlotRole.hook, SlotRole.setup, SlotRole.payoff, SlotRole.cta
 # slide and is always added when conditions allow).
 NON_OPTIONAL_ROLES = set(FIXED_SLOT_ROLES) | {SlotRole.pivot}
 
-# Drop order when the hard cap is exceeded — reverse priority. `quote` is
-# dropped last — protected above all other optional slots — once it's
-# present it is the strongest single piece of content in the carousel
-# (Decision #55).
+# Drop order when the cap is exceeded — reverse priority. `proof` and
+# `quote` are NOT in this tuple at all — they are evidence slots that
+# exist only because the card has genuine data, and the cap grows to
+# accommodate them (Decision #60) rather than the reverse. Only
+# structural/optional slots are ever droppable.
 DROP_PRIORITY = (
-    SlotRole.proof,
-    SlotRole.concept,
     SlotRole.mechanism,
     SlotRole.contrast,
-    SlotRole.quote,
+    SlotRole.concept,
 )
 
 # Final slide order (Blueprint §5.3). `quote` sits immediately after `proof`
@@ -49,9 +48,10 @@ SLOT_ORDER = (
     SlotRole.cta,
 )
 
-MAX_SLOTS = 8  # 7 content + 1 CTA (Decision #14) — 9 when the quote slot
-# fires (Decision #55); resolved as a local variable in plan_carousel(),
-# this constant documents the no-quote-slot baseline only.
+MAX_SLOTS = 8  # 7 content + 1 CTA (Decision #14) — the base cap when
+# neither proof nor quote fires. Each adds 1 on top of this, additively,
+# up to 10 when both fire (Decision #60); resolved dynamically in
+# plan_carousel(), this constant documents the neither-fires baseline only.
 
 
 def _any_node_contains(nodes: list[str], keywords: list[str]) -> bool:
@@ -78,11 +78,13 @@ def plan_carousel(context: StoryContext) -> SlotPlan:
     if len(context.dominant_numbers) > 0:
         candidates.append(SlotRole.proof)
 
-    # Quote is its own slot, distinct from proof — it only fires when BOTH a
-    # dominant number AND a strong sourced quote exist simultaneously. Either
-    # alone is handled by proof (or nothing); this is deliberately narrower
-    # than proof's own condition (Decision #55).
-    if len(context.dominant_numbers) > 0 and len(context.available_quotes) > 0:
+    # Quote is its own slot, independent of proof — a strong sourced quote
+    # is standalone evidence on its own merits, not something that needs a
+    # number alongside it to justify a slide. The anti-fabrication guard
+    # (Decision #56) already keeps weak/unsourced quotes out of
+    # available_quotes, so this condition doesn't need to double-guard
+    # against it (Decision #61).
+    if len(context.available_quotes) > 0:
         candidates.append(SlotRole.quote)
 
     if _any_node_contains(nodes, CONTRAST_KEYWORDS):
@@ -94,14 +96,18 @@ def plan_carousel(context: StoryContext) -> SlotPlan:
     if context.domain in ("finance", "ai_tech") and _any_node_contains(nodes, CONCEPT_KEYWORDS):
         candidates.append(SlotRole.concept)
 
-    # Cap resolves to 9 for this carousel when the quote slot fired, 8
-    # otherwise — a local variable, not a change to the MAX_SLOTS constant
-    # (Decision #55).
-    max_slots = 9 if SlotRole.quote in candidates else MAX_SLOTS
+    # Proof and quote are purely additive (Decision #60) — each raises the
+    # cap by 1 rather than competing with structural slots for a fixed
+    # budget. Base 8, +1 if proof fired, +1 if quote fired: 8/9/9/10.
+    effective_cap = MAX_SLOTS
+    if SlotRole.proof in candidates:
+        effective_cap += 1
+    if SlotRole.quote in candidates:
+        effective_cap += 1
 
     total = len(FIXED_SLOT_ROLES) + len(candidates)
-    if total > max_slots:
-        excess = total - max_slots
+    if total > effective_cap:
+        excess = total - effective_cap
         for role in DROP_PRIORITY:
             if excess <= 0:
                 break
