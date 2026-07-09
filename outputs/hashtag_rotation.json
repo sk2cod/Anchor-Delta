@@ -2,71 +2,71 @@
   [
     "#anchordelta",
     "#intelligencebriefing",
-    "#internationalnews",
-    "#wareconomics",
-    "#stateconflict"
+    "#bigtech",
+    "#aipolicywatch",
+    "#techgeopolitics"
   ],
   [
     "#anchordelta",
     "#intelligencebriefing",
-    "#globalaffairs",
-    "#sanctionspolicy",
-    "#regimeanalysis"
-  ],
-  [
-    "#anchordelta",
-    "#intelligencebriefing",
-    "#artificialintelligence",
-    "#aigovernance",
-    "#anthropicai"
-  ],
-  [
-    "#anchordelta",
-    "#intelligencebriefing",
-    "#worldpolitics",
-    "#geopoliticalrisk",
-    "#conflictanalysis"
-  ],
-  [
-    "#anchordelta",
-    "#intelligencebriefing",
-    "#geopolitics",
-    "#foreignpolicywatch",
-    "#securitystudies"
-  ],
-  [
-    "#anchordelta",
-    "#intelligencebriefing",
-    "#businessnews",
+    "#tradepolicy",
     "#macrotrends",
     "#centralbanking"
   ],
   [
     "#anchordelta",
     "#intelligencebriefing",
-    "#tradepolicy",
-    "#tradewarimpact",
-    "#monetarypolicywatch"
-  ],
-  [
-    "#anchordelta",
-    "#intelligencebriefing",
     "#technews",
-    "#aigovernance",
-    "#anthropicai"
+    "#anthropicai",
+    "#aigovernance"
   ],
   [
     "#anchordelta",
     "#intelligencebriefing",
-    "#machinelearning",
-    "#claudeai",
-    "#llmresearch"
+    "#geopolitics",
+    "#geopoliticalrisk",
+    "#conflictanalysis"
   ],
   [
     "#anchordelta",
     "#intelligencebriefing",
-    "#bigtech",
-    "#aipolicywatch",
-    "#techgeopolitics"
+    "#worldpolitics",
+    "#foreignpolicywatch",
+    "#securitystudies"
+  ],
+  [
+    "#anchordelta",
+    "#intelligencebriefing",
+    "#foreignpolicy",
+    "#wareconomics",
+    "#stateconflict"
+  ],
+  [
+    "#anchordelta",
+    "#intelligencebriefing",
+    "#internationalnews",
+    "#sanctionspolicy",
+    "#regimeanalysis"
+  ],
+  [
+    "#anchordelta",
+    "#intelligencebriefing",
+    "#globalaffairs",
+    "#geopoliticalrisk",
+    "#conflictanalysis"
+  ],
+  [
+    "#anchordelta",
+    "#intelligencebriefing",
+    "#aipolicy",
+    "#anthropicai",
+    "#aigovernance"
+  ],
+  [
+    "#anchordelta",
+    "#intelligencebriefing",
+    "#tradepolicy",
+    "#macrotrends",
+    "#centralbanking"
   ]
 ]

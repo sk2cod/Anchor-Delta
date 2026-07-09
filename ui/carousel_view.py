@@ -13,7 +13,7 @@ import streamlit as st
 
 from carousel.assembler import AssemblerError, build_hashtags, export_carousel
 from carousel.layout_picker import pick_layouts
-from carousel.models import Carousel, CarouselStatus
+from carousel.models import Carousel, CarouselStatus, SlotRole
 from carousel.renderer import render_slide
 from db.cards import get_card_by_id
 from db.carousel_queries import update_carousel_status, upsert_carousel
@@ -104,6 +104,16 @@ def _render_slide_thumbnails(carousel: Carousel) -> None:
         if st.session_state.get(f"editing_slide_{carousel.id}_{i}", False):
             _render_edit_panel(carousel, i, slide)
 
+    # Image regenerate panel — same full-width-below-the-row pattern as
+    # the edit panel above (not inside the narrow column, which was the
+    # original bug here: cramped text input + checkbox + button squeezed
+    # into a 270px column read as broken, not just tight).
+    for i, slide in enumerate(slides):
+        if slide.role == SlotRole.hook and st.session_state.get(
+            f"image_regen_open_{carousel.id}_{i}", False
+        ):
+            _render_image_regenerate_controls(carousel, i, slide)
+
 
 def _render_slide_controls(carousel: Carousel, index: int, slide) -> None:
     edit_key = f"editing_slide_{carousel.id}_{index}"
@@ -190,6 +200,92 @@ def _render_slide_controls(carousel: Carousel, index: int, slide) -> None:
                     st.rerun()
                 except Exception as e:
                     st.error(f"Undo failed: {e}")
+
+    if slide.role == SlotRole.hook:
+        image_regen_key = f"image_regen_open_{carousel.id}_{index}"
+        if st.button("🖼️", key=f"image_regen_btn_{carousel.id}_{index}",
+                     help="Regenerate cover image"):
+            st.session_state[image_regen_key] = not st.session_state.get(
+                image_regen_key, False
+            )
+
+
+def _render_image_regenerate_controls(carousel: Carousel, index: int, slide) -> None:
+    """
+    Hook-slide-only cover image regenerate. Text-only Sonnet regenerate
+    (the 🔄 button above) never touches the image (Decision #64 — it
+    preserves image_asset unchanged), and there was previously no way to
+    get a new image without also getting new text. This is a pure image
+    swap: one gpt-image-1 call via image_generator.generate_cover_image(),
+    no Sonnet call, so headline/sub-heading are never touched.
+
+    Keywords are a full override of the auto-derived visual_subject, not
+    a blend with it — if the Haiku-derived subject was wrong (the
+    original problem this button exists to fix), blending would still
+    drag the wrong guess along. is_person is a manual toggle, not
+    inferred or defaulted by this code: image generation policy makes a
+    named public figure's likeness unreliable regardless of the flag,
+    but that's the user's call to test, not something to silently gate.
+
+    Rendered full-width below the entire slide row (see
+    _render_slide_thumbnails) — not inside the narrow per-slide column,
+    same reasoning as the edit panel.
+    """
+    st.markdown("##### 🖼️ Regenerate cover image")
+    keywords = st.text_input(
+        "Keywords (optional — overrides the auto-derived subject entirely)",
+        placeholder="e.g. uranium enrichment facility",
+        key=f"image_keywords_{carousel.id}_{index}",
+    )
+    is_person = st.checkbox(
+        "Portrait / person composition",
+        key=f"image_is_person_{carousel.id}_{index}",
+        value=False,
+    )
+    if st.button("Regenerate image", key=f"regen_image_{carousel.id}_{index}"):
+        with st.spinner("Generating new cover image..."):
+            try:
+                from carousel import image_generator
+                from carousel.context_builder import build_context
+                from carousel.loader import load_card
+
+                domain = _infer_domain(carousel)
+                if keywords.strip():
+                    visual_subject = keywords.strip()
+                    subject_is_person = is_person
+                else:
+                    context = build_context(load_card(carousel.card_id))
+                    visual_subject = context.visual_subject
+                    subject_is_person = context.visual_subject_is_person
+
+                new_asset = image_generator.generate_cover_image(
+                    visual_subject=visual_subject,
+                    is_person=subject_is_person,
+                    domain=domain,
+                )
+                if new_asset is None:
+                    st.error(
+                        "Image generation failed — check OPENAI_API_KEY, "
+                        "billing, or logs for the underlying error."
+                    )
+                else:
+                    carousel.spec.slides[index].image_asset = new_asset
+                    enriched = pick_layouts(carousel.spec, domain)
+                    target_enriched = enriched.slides[index]
+                    new_path = render_slide(
+                        target_enriched,
+                        slide_index=index,
+                        total_slides=len(carousel.spec.slides),
+                        force=True,
+                    )
+                    paths = list(carousel.slide_paths)
+                    paths[index] = str(new_path)
+                    carousel.slide_paths = paths
+                    upsert_carousel(carousel)
+                    st.session_state[f"carousel_{carousel.card_id}"] = carousel
+                    st.rerun()
+            except Exception as e:
+                st.error(f"Image regenerate failed: {e}")
 
 
 def _render_edit_panel(carousel: Carousel, index: int, slide) -> None:

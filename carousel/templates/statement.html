@@ -19,12 +19,21 @@
       letter-spacing: -1px;
     }
 
+    /* Left-aligned, slightly narrower than the headline's own measure
+       (Decision #68) — headline stays centred (inherits .content's
+       text-align: center), but a long body block reading centred forces
+       the eye to hunt for each new line's start point. A ragged-right,
+       flush-left block with a modest inset reads as an intentional text
+       column instead. */
     .body-text {
       font-family: var(--font-body);
       font-weight: 400;
       font-size: 72px;
-      line-height: 1.65;
+      line-height: 1.75;
       color: var(--text-muted);
+      text-align: left;
+      max-width: 1100px;
+      margin: 0 auto;
     }
 
     .body-text .accent {

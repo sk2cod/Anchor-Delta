@@ -39,8 +39,11 @@ OUTPUT_DIR = REPO_ROOT / "outputs" / "cover_images"
 
 SHADOW_HEX = "#1A1612"  # brand background tone — the duotone shadow colour
 IMAGE_MODEL = "gpt-image-1"
-IMAGE_TIMEOUT_SECONDS = 45.0  # bounded — a hanging call must degrade to the
-# None-fallback within a predictable window, not block the whole request
+IMAGE_TIMEOUT_SECONDS = 90.0  # bounded — a hanging call must degrade to the
+# None-fallback within a predictable window, not block the whole request.
+# Was 45s; raised after real "Request timed out" failures once size moved
+# 1024x1024 -> 1024x1536 (50% more pixels at quality="high" routinely
+# pushed real generation time past the old bound).
 
 # Descriptive colour words / tone words for the DALL-E prompt text —
 # distinct from DOMAIN_ACCENTS (hex, reused from layout_picker rather than
@@ -102,20 +105,22 @@ def generate_cover_image(visual_subject: str, is_person: bool, domain: str) -> O
 
     if is_person:
         prompt = (
-            f"Editorial pencil sketch portrait of {visual_subject}, detailed "
-            f"recognisable features, serious authoritative expression, dark "
-            f"near-black warm {domain_tone} background, dramatic chiaroscuro "
-            f"with {accent_word} accent highlights, high contrast, editorial "
-            f"magazine illustration style, no text, no logos, no watermarks, "
-            f"portrait orientation"
+            f"Graphic portrait illustration of {visual_subject}, bold ink and "
+            f"charcoal style, sharp detailed features, serious authoritative "
+            f"expression, dark near-black solid {domain_tone} background, "
+            f"extreme dramatic chiaroscuro with aggressive {accent_word} "
+            f"highlights catching the edges of the face, high contrast, "
+            f"editorial magazine cover art, no text, no logos, no watermarks, "
+            f"aspect ratio 9:16, vertical orientation"
         )
     else:
         prompt = (
-            f"Cinematic dark editorial macro image of {visual_subject}, deep "
-            f"near-black {domain_tone} background, {accent_word} accent light "
-            f"tracing key elements, dramatic chiaroscuro, no text, no logos, "
-            f"no watermarks, editorial magazine cover style, ultra high "
-            f"contrast, portrait orientation"
+            f"Minimalist cinematic editorial shot of {visual_subject}, clean "
+            f"sharp composition, deep near-black {domain_tone} background, "
+            f"stark {accent_word} rim lighting outlining the silhouette and "
+            f"tracing key elements, dramatic chiaroscuro, ultra high contrast, "
+            f"dramatic shadows, editorial magazine cover style, no text, no "
+            f"logos, no watermarks, aspect ratio 9:16, vertical orientation"
         )
 
     try:
@@ -130,7 +135,7 @@ def generate_cover_image(visual_subject: str, is_person: bool, domain: str) -> O
         response = client.images.generate(
             model=IMAGE_MODEL,
             prompt=prompt,
-            size="1024x1024",
+            size="1024x1536",
             quality="high",
             n=1,
         )

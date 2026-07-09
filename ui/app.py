@@ -299,6 +299,19 @@ def render_card(card_data):
 
         st.markdown(_THIN_DIVIDER, unsafe_allow_html=True)
         if not card.get('is_archived', False):
+            if card.get('domain') in ('world', 'finance', 'ai_tech'):
+                with st.expander("🖼️ Cover image keywords (optional)", expanded=False):
+                    st.text_input(
+                        "Keywords (optional — overrides the auto-derived subject entirely)",
+                        placeholder="e.g. uranium enrichment facility",
+                        key=f"gen_image_keywords_{card['id']}",
+                    )
+                    st.checkbox(
+                        "Portrait / person composition",
+                        key=f"gen_image_is_person_{card['id']}",
+                        value=False,
+                    )
+
             col1, col2, col3, col4 = st.columns([4, 1, 1, 1])
             with col2:
                 if st.button("📦", key=f"archive_{card['id']}", help="Archive this card"):
@@ -358,6 +371,20 @@ def render_card(card_data):
 
                         story_card = load_card(card['id'])
                         context = build_context(story_card)
+
+                        # Manual cover-image keyword override (optional) —
+                        # full override of the Haiku-derived visual_subject,
+                        # not a blend with it, same convention as the
+                        # regenerate-image button in ui/carousel_view.py.
+                        gen_keywords = st.session_state.get(
+                            f"gen_image_keywords_{card['id']}", ""
+                        ).strip()
+                        if gen_keywords:
+                            context.visual_subject = gen_keywords
+                            context.visual_subject_is_person = st.session_state.get(
+                                f"gen_image_is_person_{card['id']}", False
+                            )
+
                         spec = write_carousel(
                             context, card_id=card['id']
                         )

@@ -23,6 +23,7 @@ fails the overall call; the cover slide just renders typography-only.
 
 import hashlib
 import json
+import logging
 import os
 import uuid
 from datetime import datetime
@@ -44,6 +45,8 @@ from carousel.models import (
 
 load_dotenv()
 
+logger = logging.getLogger(__name__)
+
 SONNET_MODEL = "claude-sonnet-4-6"
 MAX_TOKENS = 4000
 PROMPT_PATH = Path(__file__).parent / "prompts" / "writer_v2_0.md"
@@ -56,6 +59,21 @@ OUTPUT_COST_PER_TOKEN = 0.000015
 
 class CarouselWriteError(Exception):
     pass
+
+
+class QuoteFabricationError(CarouselWriteError):
+    """
+    A quote slide's attribution doesn't match a real card speaker
+    (Decision #56). Distinct from CarouselWriteError so write_carousel()
+    can recognise this specific, recoverable failure and, on the final
+    retry, drop the offending slide instead of failing the whole
+    carousel (Decision #69) — a quote beat is optional narrative garnish
+    (Decision #67), never a show-stopper.
+    """
+
+    def __init__(self, message: str, slot_id: str):
+        super().__init__(message)
+        self.slot_id = slot_id
 
 
 def _load_system_prompt() -> str:
@@ -160,8 +178,17 @@ def _build_spec_from_response(
     prompt_version: str,
     usage,
     available_quotes: list[SourcedQuote],
+    strict_quotes: bool = True,
 ) -> CarouselSpec:
-    """Parse + validate a writer response into a CarouselSpec. Raises on any failure."""
+    """
+    Parse + validate a writer response into a CarouselSpec. Raises on any
+    failure — except a fabricated quote attribution when strict_quotes is
+    False, in which case that one slide is dropped instead (Decision #69),
+    so a bad quote never fails an otherwise-good carousel. strict_quotes
+    should be True on the first attempt (so a fabricated quote still
+    triggers the normal one-retry path) and False on the retry (so a
+    second failure degrades gracefully instead of raising).
+    """
     data = json.loads(_strip_json_fences(response_text))
 
     slides = []
@@ -172,6 +199,7 @@ def _build_spec_from_response(
         ).hexdigest()
         slides.append(slide)
 
+    kept_slides = []
     for slide in slides:
         if slide.quote is not None and not _quote_attribution_matches_card(
             slide.quote.attribution, available_quotes
@@ -181,12 +209,22 @@ def _build_spec_from_response(
             # whose attribution isn't a real, named card speaker. This is
             # deterministic Python judgment, not LLM self-verification —
             # same philosophy as the kicker-None guard in regenerate_slide().
-            raise CarouselWriteError(
-                f"Slide {slide.slot_id!r} has a quote attributed to "
-                f"{slide.quote.attribution!r}, which does not match any real "
-                "speaker in this card's sourced quotes — refusing to render "
-                "a fabricated quote."
+            if strict_quotes:
+                raise QuoteFabricationError(
+                    f"Slide {slide.slot_id!r} has a quote attributed to "
+                    f"{slide.quote.attribution!r}, which does not match any "
+                    "real speaker in this card's sourced quotes — refusing "
+                    "to render a fabricated quote.",
+                    slot_id=slide.slot_id,
+                )
+            logger.warning(
+                "Dropping slide %r — quote attributed to %r still doesn't "
+                "match any real card speaker after retry (Decision #69).",
+                slide.slot_id, slide.quote.attribution,
             )
+            continue
+        kept_slides.append(slide)
+    slides = kept_slides
 
     cost_usd = (
         usage.input_tokens * INPUT_COST_PER_TOKEN
@@ -287,14 +325,41 @@ def write_carousel(
     try:
         spec = _build_spec_from_response(
             response_text, card_id, card_version, prompt_version, message.usage,
-            context.available_quotes,
+            context.available_quotes, strict_quotes=True,
         )
     except Exception as first_error:
         # One automatic retry, with the validation error appended to the prompt.
+        retry_note = str(first_error)
+        if isinstance(first_error, QuoteFabricationError):
+            # Decision #69 — a generic "fix it" message let the model try a
+            # second, still-wrong attribution instead of the right recovery
+            # (drop the quote beat). Be explicit about the actual fix.
+            retry_note += (
+                "\n\nDo not attempt another attribution for this quote. "
+                "Remove the dedicated quote-role beat entirely. If the "
+                "finding still matters, fold it into a regular beat's own "
+                "prose as plain narrative language instead of the "
+                "structured quote field — that never needs to match "
+                "AVAILABLE QUOTES verbatim."
+            )
+        elif isinstance(first_error, planner.WordBudgetExceededError):
+            # Decision #70 — a generic "fix it" message let a retried beat
+            # get LONGER, not shorter (34 -> 35 words on a real generation).
+            # Trimming words in place isn't reliably how the model recovers
+            # from this; splitting the overloaded beat into two is.
+            retry_note += (
+                "\n\nDo not try to trim this beat further — that has "
+                "already failed once. Split it into two beats instead: "
+                "keep each piece of content (the quote, the statistic, the "
+                "second idea — whatever is making this beat too long) but "
+                "give it its own beat with its own headline, rather than "
+                "compressing everything into one. There is slide-count "
+                "headroom for this (maximum 10 total)."
+            )
         retry_message = (
             user_message
             + "\n\nYour previous response failed validation with this error:\n"
-            + f"{first_error}\n\n"
+            + retry_note + "\n\n"
             + "Return corrected JSON only, matching the required structure exactly."
         )
         try:
@@ -315,6 +380,7 @@ def write_carousel(
                 prompt_version,
                 retry_response.usage,
                 context.available_quotes,
+                strict_quotes=False,
             )
         except Exception as second_error:
             raise CarouselWriteError(

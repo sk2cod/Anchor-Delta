@@ -1357,6 +1357,174 @@ Supabase card (in progress).
 
 ---
 
+## #68 — Beat body word budget tightened and actually enforced; body text left-aligned
+
+**Date:** 2026-07-09
+**Decision:** A real carousel generated from Streamlit (world domain,
+"crypto goes mainstream," carousel id `7bda4152-c493-4654-b43c-9e92a3b4c7e4`)
+surfaced two compounding problems: every beat body ran 48-56 words
+against `writer_v2_0.md`'s stated ≤40-word cap — a cap that was never
+actually checked anywhere in code — and `statement.html` rendered that
+long body as a single centre-aligned block with no paragraph structure,
+producing 9-11 line walls of text on every interior slide.
+
+Two fixes, kept independent of Decision #67's "one continuous thought,
+not a bulleted list" narrative style (deliberately not adopting the
+literal bulleted/segmented block format from the viewer feedback that
+prompted this — that would partially reverse #67, not just restyle it):
+
+1. **Word budget tightened 40 → 30 words per beat body, and enforced.**
+   `carousel/planner.py`'s `validate_carousel_shape()` gained per-role
+   word-count checks (`MAX_HOOK_HEADLINE_WORDS`=8, `MAX_HOOK_BODY_WORDS`=15,
+   `MAX_BEAT_HEADLINE_WORDS`=14, `MAX_BEAT_BODY_WORDS`=30), feeding the
+   same one-retry mechanism as the existing shape/quote-fabrication
+   guards — "stated in the prompt, enforced in code," same pattern as
+   everything else in that file. `writer_v2_0.md`'s Shape section, Hard
+   Constraints word-limits table, and "On malformed output" checklist
+   updated to match.
+2. **`statement.html`'s `.body-text` left-aligned** with a modest
+   `max-width: 1100px` inset (narrower than the headline's 1250px
+   measure) and `line-height` 1.65 → 1.75. Headline stays centred
+   (unaffected — inherits `.content`'s `text-align: center`). Verified
+   the real 51-word beat_1 body from the crypto carousel through the
+   new CSS (still readable, clearly improved), then verified a
+   budget-compliant ~34-word version of the same content: 6 lines
+   instead of 9, flush-left edge, real whitespace at the bottom.
+**Why:** Direct viewer feedback on a real generated carousel: dense
+centre-aligned paragraphs read as "homework" and force the eye to
+hunt for each new line's start. Investigating the claim against the
+actual rendered slides found the real driver was the un-enforced word
+budget (25-40% over spec on every beat), not primarily alignment —
+alignment was a secondary but genuine readability win on top of it.
+Deliberately did not adopt the feedback's literal bulleted-list
+proposal, since Decision #67 was validated against
+`carousel_narrative_mockups.md` specifically to move away from a
+list-of-facts read.
+**Status:** Active.
+
+---
+
+## #69 — Quote fabrication guard degrades gracefully instead of failing the whole carousel
+
+**Date:** 2026-07-10
+**Decision:** A real generation (ai_tech card `6a5f1a8f-c307-4594-882a-ea93b78657a7`,
+"Claude's Hidden Mind") hard-failed twice in a row: the card's one sourced
+quote has a malformed `attribution` field — a full citation string
+("Anthropic's 16-author research paper, 'Verbalizable Representations
+Form a Global Workspace in Language Models' (Research team)") rather
+than a person's name, because the source has no individual human
+speaker. The writer tried "Anthropic Research Team," then "Anthropic
+research paper" as shortened attributions; the Decision #56
+anti-fabrication guard correctly rejected both (neither is a substring
+of the real citation string), but after the one retry the entire
+carousel generation raised `CarouselWriteError` and failed outright.
+
+Three changes, none weakening the anti-fabrication guard itself —
+attribution still must match verbatim, never approximately:
+
+1. **`carousel/writer.py`** — `_build_spec_from_response()` gains a
+   `strict_quotes: bool` parameter. `True` (first attempt) behaves as
+   before, raising a new `QuoteFabricationError(CarouselWriteError)`.
+   `False` (the retry) drops the offending slide instead of raising —
+   logged as a warning, not surfaced as an error. `write_carousel()`
+   passes `strict_quotes=True` on the first call, `False` on the retry,
+   so a fabricated quote gets one chance to self-correct and then is
+   silently dropped rather than failing the whole generation. Same
+   "degrade gracefully, never hard-fail on a soft dependency" pattern
+   already used for cover-image generation (Decision #64).
+2. **Sharper retry message** — when the first failure is specifically a
+   `QuoteFabricationError`, the retry prompt now explicitly says to
+   drop the quote beat entirely rather than trying another attribution.
+   Previously the retry just echoed the raw validation error back with
+   a generic "fix it," which is why the second attempt made the same
+   mistake in a different way.
+3. **`writer_v2_0.md`** — restored an explicit "no forced quote"
+   fallback that existed in `writer_v1_9.md` but was dropped when the
+   Story Arc & Beat Writing Guide replaced the old per-slot guides for
+   Decision #67. Also hardened the verbatim-attribution instruction:
+   copy the attribution character-for-character, never shorten or
+   clean it up for a better-looking slide headline — a felt need to
+   shorten it is itself the signal that quote shouldn't be a dedicated
+   beat at all.
+**Why:** The guard did exactly what Decision #56 designed it to do —
+refuse a fabricated attribution. The bug was the *recovery* path: a
+card can have a genuinely strong, quote-worthy finding attached to
+metadata that just isn't a clean person-name (an anonymous paper, a
+press release, an institutional statement), and the old behavior threw
+the whole carousel away rather than the one slide that didn't work.
+Since Decision #67 already made quote beats optional narrative garnish
+rather than a required slot, failing generation entirely over one
+was inconsistent with that architecture — confirmed by comparing
+against a same-session card (Australia/India nuclear deal) that
+generated successfully with zero quote beats, because the model
+correctly judged nothing available was quote-worthy there. Same
+system, two different card data shapes — one degrades gracefully by
+design (no quote), the other should too (bad-metadata quote).
+**Status:** Active.
+
+---
+
+## #70 — Split overloaded beats instead of cutting content; word budget is a readability constraint, not a content ceiling
+
+**Date:** 2026-07-10
+**Decision:** Tracing why the Albanese quote (Australia/India uranium
+card, `13eb60e5-cfa9-434e-a4be-17adb2be73bd`) disappeared across
+regenerations found it wasn't dropped by extraction or judged
+unimportant by the writer — it was cut to fit the Decision #68
+word budget, because `writer_v2_0.md` had no instruction telling the
+model that splitting an overloaded beat into two was even an option.
+The only guidance pointed toward compression ("fold into a neighbour
+or cut"), and — worse — a leftover line in the `## Shape` section
+still explicitly said "cut a supporting clause before you cut the
+number or the quote," directly contradicting the fix once added.
+Separately, the same word-budget guard was still hard-failing
+generations outright on a near-miss (`beat_2` at 34, then 35 words on
+retry — got worse, not better), because the retry message just echoed
+the raw error back with no specific instruction.
+
+Three changes:
+1. **`carousel/planner.py`** — new `WordBudgetExceededError
+   (PlannerValidationError)`, structured the same way as Decision
+   #69's `QuoteFabricationError`, replacing the four generic
+   `PlannerValidationError` raises for hook/beat headline/body checks.
+2. **`carousel/writer.py`** — `write_carousel()`'s retry logic detects
+   `WordBudgetExceededError` specifically and appends a targeted hint:
+   split the overloaded beat into two, preserving every piece of
+   content, instead of trying to trim further.
+3. **`writer_v2_0.md`** — new `## The essence` section opens the Story
+   Arc & Beat Writing Guide: the carousel must be both concise/
+   well-paced AND carry everything genuinely good from the source
+   material — neither goal ever trades against the other; when they
+   seem to conflict, the fix is to give content the space it needs
+   (more slides), never to cut it. 10 slides is a hard ceiling
+   (Instagram's platform limit), explicitly not a target — most
+   readers' attention holds through ~7, but the ceiling is set higher
+   specifically so real content is never forced out just to stay
+   short. New `## Splitting an overloaded beat` section gives the
+   concrete mechanic (split, don't cut) with a worked example. The
+   contradictory `## Shape` line was rewritten: the 30-word budget is
+   now explicitly framed as a single-slide readability constraint,
+   not a content ceiling — hitting it is the signal to split, not to
+   delete the quote/number/idea that made the beat worth writing.
+**Why:** User's framing, direct: the word budget exists "for ease of
+reading so there is more white space," never as license to drop good
+content. A carousel that's easy to read but has quietly cut real
+substance to hit a number has failed exactly as much as one that's
+complete but exhausting to read — visual polish and content richness
+must marry into one carousel, not trade off against each other. The
+writer needs to actually understand this intent and write with real
+judgment, not pattern-match a word-count rule.
+**Verified:** re-ran the real Australia/India card after the
+`WordBudgetExceededError` + retry-hint fix (before the essence
+rewrite) — generation succeeded without hard-failing, though that run
+still didn't preserve the quote (a valid creative call the model made
+without hitting an overload situation, not a bug) — which is what
+motivated writing the essence section explicitly rather than relying
+on implicit prompt inference.
+**Status:** Active.
+
+---
+
 ## Open questions to revisit
 
 - **Anonymous handle name.** Pending account creation.
@@ -1465,3 +1633,25 @@ Supabase card (in progress).
   generations, kept on the enum for old Supabase rows. New
   `writer_v2_0.md`. `writer.py` and `ui/app.py` updated to drop
   `slot_plan`.
+- 2026-07-09: Decision #68 added — beat body word budget tightened
+  40 → 30 words and actually enforced (`validate_carousel_shape()`
+  gains per-role word-count checks; real generation had been running
+  48-56 words per beat with nothing catching it). `statement.html`
+  body text left-aligned with a modest inset, line-height 1.65 → 1.75.
+- 2026-07-10: Decision #69 added — quote-fabrication guard degrades
+  gracefully instead of hard-failing the whole carousel. New
+  `QuoteFabricationError`; `_build_spec_from_response()` gains
+  `strict_quotes` (raise-and-retry on first attempt, drop-the-slide on
+  retry). Sharper retry message when the failure is quote-specific.
+  `writer_v2_0.md` gets back the "no forced quote" fallback dropped
+  during the Decision #67 rewrite, plus a verbatim-attribution
+  hardening. Also this session: cover-image keyword override at both
+  generation entry points, image-controls UI layout fix, and
+  `IMAGE_TIMEOUT_SECONDS` 45s → 90s.
+- 2026-07-10: Decision #70 added — split overloaded beats instead of
+  cutting content. New `WordBudgetExceededError`; retry gets a
+  targeted "split, don't trim" hint. `writer_v2_0.md` gains a `## The
+  essence` section (content and readability never trade off; 10-slide
+  ceiling is deliberately above the ~7-slide attention span so content
+  is never forced out) and fixes a real contradiction where `## Shape`
+  still said to cut a quote/number to hit the word budget.

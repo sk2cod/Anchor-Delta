@@ -290,6 +290,39 @@ old per-slot writing guides (setup/event/pivot/mechanism/concept/
 proof/contrast) entirely. Those roles are retired. Everything
 between the hook and the cta is now a `beat`.
 
+## The essence (Decision #70)
+
+Two things must both be true at once, and neither is ever traded
+against the other: the carousel must read as one flowing story —
+concise, simple, well-paced, easy on the eye — and it must carry
+everything genuinely good from the source material. A carousel
+that's pleasant to read but has quietly dropped a real quote, a
+real number, or a real idea to make a slide's word count has
+failed exactly as much as one that's complete but exhausting to
+read. When those two goals seem to pull against each other, the
+fix is never to cut good content to fit the space you first
+picked — it's to give the content the space it actually needs.
+Think in terms of how much room the story needs, not how to
+compress the story into a room size chosen up front. Visual
+pleasure and content richness are not in tension; they marry into
+one cohesive carousel, or the carousel isn't finished yet.
+
+10 slides is a hard ceiling (Instagram's own platform limit), not
+a target — reaching it should be rare, since most readers' real
+attention holds through around 7. But the ceiling is set at 10,
+not 7, specifically so you are never forced to cut real content
+just because a shorter carousel is more typical. A 6-slide
+carousel that says everything worth saying is the best outcome on
+most cards. An 8 or 9-slide one is completely correct when the
+story genuinely has that much real substance — and is a better
+carousel than a 6-slide one that quietly dropped a quote or a
+number to stay short.
+
+None of this is a checklist to apply mechanically. It takes
+actually understanding what the story is, what in the source
+material genuinely earns its place, and writing with real craft —
+not pattern-matching against rules. Use your judgment.
+
 ## Finding the arc
 
 The transmission's nodes (the Intelligence Engine's 3-5 analytical
@@ -304,7 +337,10 @@ beat raised, and does it raise the question the next beat answers?
 If a beat doesn't do both, either fold it into a neighbour or cut
 it. A carousel is one continuous thought stretched across slides,
 not a list of separate facts that happen to be about the same
-story.
+story. This folding/cutting test is for a WEAK beat — one that's
+thin, redundant, or doesn't earn its place. It is the opposite
+situation from an OVERLOADED beat (see "Splitting an overloaded
+beat" below), which has too much good content, not too little.
 
 ## Writing a beat
 
@@ -341,7 +377,26 @@ empty string "". emphasis_word is the single most powerful word
 in the quote text if one clearly stands out, otherwise null.
 HARD GUARDRAIL: never fabricate a quote or paraphrase a real one
 into the quote field — paraphrase is fabrication here, not
-compression.
+compression. This includes the attribution itself: copy it
+character-for-character from AVAILABLE QUOTES. Do not shorten,
+clean up, or rephrase an attribution to make it read better as a
+headline — "Anthropic's 16-author research paper, 'Title'
+(Research team)" must be copied exactly as given, not simplified
+to "Anthropic Research Team" or similar. If a shortened version
+feels necessary, that is a sign this quote should not be a
+dedicated beat at all (see fallback below).
+
+Fallback — no forced quote: if nothing in AVAILABLE QUOTES has
+both a real, clean attribution and content strong enough to stand
+alone with zero surrounding explanation, do not create a
+dedicated quote beat. This is common and expected, not a failure
+— many cards have no quote that clears this bar. Two options
+instead: fold the finding into a regular beat's own prose in
+plain text (e.g. "Anthropic's own researchers called the finding
+'striking'" — attribution as narrative language, not the
+structured quote field, so it never needs to pass the verbatim-
+match guardrail), or leave it out entirely if it doesn't earn a
+place in the story.
 
 Regional or niche angles only earn their own beat if the region
 or niche IS the story. A detail that's a consequence for a
@@ -349,6 +404,30 @@ specific audience rather than the core story compresses into a
 single line inside another beat, or gets cut — the audience is
 global, and a beat that only lands for one region weakens a
 carousel meant to close on a universal point.
+
+## Splitting an overloaded beat (Decision #70)
+
+Sometimes a single beat has more good, true content than its word
+budget allows — a supporting quote AND a load-bearing statistic
+AND the framing that ties them together, all genuinely earning
+their place. When that happens, split the beat into two rather
+than cutting content to fit. There is room for this: minimum 5,
+maximum 10 slides total, and a carousel with 7 or 8 tightly-written
+beats beats one with 5 beats each overstuffed past budget.
+
+Cutting is for removing weak or redundant words from a beat that's
+merely over-written. Splitting is for a beat that's over budget
+because it's carrying too much genuinely good content — do not
+solve that problem by deleting the quote, the number, or the
+second idea. Give the deserving piece its own beat instead, with
+its own headline, continuing the same arc.
+
+Example: a beat trying to hold "Albanese framed it as clean
+power: '[quote]'" AND "India runs 70% of its electricity on coal
+and targets 100GW of nuclear by 2047" in one 63-word body is
+overloaded, not over-written. The fix is not to drop the quote to
+make it fit — it's two beats: one carrying the quote, the next
+carrying the energy numbers, each within budget on its own.
 
 ## Shape
 
@@ -359,11 +438,18 @@ not force extra beats to hit a round number — a 6-slide carousel
 that earns every slide beats an 8-slide one with two that don't.
 Let the story's own length decide, inside that range.
 
-Word budget per beat: headline ≤14 words, body ≤40 words. This is
-wider than the old per-slot limits — a beat carrying an inline
-number or a woven quote clause needs more room than a bare
-statement did, and the aim is the sharpest true sentence, not the
-shortest one.
+Word budget per beat: headline ≤14 words, body ≤30 words (Decision
+#68 — tightened from an earlier ≤40 after real generations
+consistently ran 48-56 words per beat with nothing in code actually
+enforcing the limit; `validate_carousel_shape()` now rejects and
+retries any beat over budget). This is a readability constraint on
+one slide, not a content ceiling on the story — it exists so each
+slide is easy to read at a glance with real whitespace, never so
+that content gets dropped to hit a number. If a beat's true content
+doesn't fit in 30 words, that's the signal to split it into another
+beat (see "Splitting an overloaded beat" above) — never a signal to
+cut the number, the quote, or the idea that made the beat worth
+writing in the first place.
 
 ## cta
 Job: convert. Fixed copy.
@@ -381,7 +467,7 @@ hook headline: ≤8 words, one line, one sentence, no colon
   (Decision #64); sub_heading in body: ≤15 words, one sentence,
   completes not repeats the headline (Cover template, Decision #53)
 beat headline: ≤14 words
-beat body: ≤40 words (Decision #67)
+beat body: ≤30 words (Decision #68)
 quote headline: attribution name only (Decision #55)
 cta: fixed copy only
 
@@ -548,6 +634,11 @@ To avoid this:
 - At most 2 dedicated quote-role slides
 - dominant_numbers and factsheet_title must be null on every
   slide — weave numbers into beat prose instead
+- Every word budget above is enforced, not a suggestion: hook
+  headline ≤8 words, hook sub-heading ≤15 words, beat headline
+  ≤14 words, beat body ≤30 words (Decision #68). Count before you
+  return — a beat that's making its point in 45 words needs to be
+  cut to its sharpest 30, not left over budget.
 
 ---
 
