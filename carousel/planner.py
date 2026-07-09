@@ -1,126 +1,81 @@
 """
-CarouselPlanner — decides slot structure and order for a card (Blueprint §5.3).
+CarouselPlanner — validates carousel shape after writing (Decision #67).
 
-Deterministic Python only — the LLM never decides slide count or structure
-(Decision #03, #13). Eliminates roughly 80% of "carousel is the wrong shape"
-failures by keeping structure fully deterministic; only slide content is
-creative.
+Before Decision #67: this module decided slide count and role
+deterministically in Python *before* the writer ran (Decision #03, #13 —
+"the LLM never decides slide count or structure"), via keyword-matching
+against the transmission's nodes. The writer was then instructed to fill
+exactly that pre-built structure.
+
+That guarantee is deliberately relaxed as of Decision #67: viewer feedback
+was that carousels built from a fixed slot structure read as disconnected
+facts, not a story. The writer now reads the full StoryContext itself and
+decides the story's own natural shape — how many beats it needs, where
+quotes and numbers land — rather than a Python keyword-hint proxy trying
+to notice that for it.
+
+This module's job inverts to match: instead of deciding structure before
+writing, it validates the writer's chosen structure after writing. Same
+"deterministic Python judgment, not LLM self-verification" philosophy as
+the existing quote-fabrication guard in writer.py — just applied to shape
+instead of content. Called from writer.py's _build_spec_from_response(),
+feeding the existing one-retry mechanism on failure.
 """
 
-from carousel.models import Slot, SlotPlan, SlotRole, StoryContext
+from carousel.models import CarouselSpec, SlotRole
 
-# Keyword lists — simple, fast, no LLM. Tune here.
-CONTRAST_KEYWORDS = ["while", "meanwhile", "however", "but", "whereas"]
-MECHANISM_KEYWORDS = ["because", "which means", "this is why", "the reason", "how this works"]
-CONCEPT_KEYWORDS = ["framework", "model", "structure", "system", "principle", "pattern"]
-
-FIXED_SLOT_ROLES = (SlotRole.hook, SlotRole.setup, SlotRole.payoff, SlotRole.cta)
-
-# Roles that are never marked optional, even though `pivot` is only added by
-# a rule rather than being a fixed slot (Decision #13 — pivot is the reframe
-# slide and is always added when conditions allow).
-NON_OPTIONAL_ROLES = set(FIXED_SLOT_ROLES) | {SlotRole.pivot}
-
-# Drop order when the cap is exceeded — reverse priority. `proof` and
-# `quote` are NOT in this tuple at all — they are evidence slots that
-# exist only because the card has genuine data, and the cap grows to
-# accommodate them (Decision #60) rather than the reverse. Only
-# structural/optional slots are ever droppable.
-DROP_PRIORITY = (
-    SlotRole.mechanism,
-    SlotRole.contrast,
-    SlotRole.concept,
-)
-
-# Final slide order (Blueprint §5.3). `quote` sits immediately after `proof`
-# and before `contrast`/`payoff` when present (Decision #55).
-SLOT_ORDER = (
-    SlotRole.hook,
-    SlotRole.event,
-    SlotRole.setup,
-    SlotRole.pivot,
-    SlotRole.mechanism,
-    SlotRole.concept,
-    SlotRole.proof,
-    SlotRole.quote,
-    SlotRole.contrast,
-    SlotRole.payoff,
-    SlotRole.cta,
-)
-
-MAX_SLOTS = 8  # 7 content + 1 CTA (Decision #14) — the base cap when
-# neither proof nor quote fires. Each adds 1 on top of this, additively,
-# up to 10 when both fire (Decision #60); resolved dynamically in
-# plan_carousel(), this constant documents the neither-fires baseline only.
+MIN_SLIDES = 5  # user-stated minimum — no padding below this
+MAX_SLIDES = 10  # Instagram's actual platform limit on carousel items,
+# not an arbitrary number — matches the old system's own ceiling case
+# (8 base + 1 proof + 1 quote = 10).
+MAX_QUOTE_SLIDES = 2  # a quote only earns its own beat when it's strong
+# enough to stand alone; more than a couple in one carousel means quotes
+# are being used as filler, not as the sharpest possible line.
 
 
-def _any_node_contains(nodes: list[str], keywords: list[str]) -> bool:
-    """True if any keyword appears as a substring of any transmission node."""
-    lowered_nodes = [node.lower() for node in nodes]
-    return any(keyword in node for node in lowered_nodes for keyword in keywords)
+class PlannerValidationError(Exception):
+    pass
 
 
-def plan_carousel(context: StoryContext) -> SlotPlan:
+def validate_carousel_shape(spec: CarouselSpec) -> None:
     """
-    Decide slot structure for this card.
-    Pure Python. No LLM. No I/O. No side effects.
-    Cost: $0. Latency: <10ms.
+    Deterministic post-write shape check. Raises PlannerValidationError on
+    any violation; never mutates spec. Pure Python. No LLM. No I/O.
+    Cost: $0. Latency: <1ms.
     """
-    nodes = context.transmission_summary.nodes
+    slides = spec.slides
 
-    candidates: list[SlotRole] = []
+    if not slides:
+        raise PlannerValidationError("Carousel has no slides.")
 
-    if context.latest_delta is not None:
-        candidates.append(SlotRole.event)
+    if slides[0].role != SlotRole.hook:
+        raise PlannerValidationError(
+            f"First slide must have role 'hook', got {slides[0].role.value!r}."
+        )
 
-    candidates.append(SlotRole.pivot)  # always — the reframe slide
+    if slides[-1].role != SlotRole.cta:
+        raise PlannerValidationError(
+            f"Last slide must have role 'cta', got {slides[-1].role.value!r}."
+        )
 
-    if len(context.dominant_numbers) > 0:
-        candidates.append(SlotRole.proof)
+    if not (MIN_SLIDES <= len(slides) <= MAX_SLIDES):
+        raise PlannerValidationError(
+            f"Carousel has {len(slides)} slides; must be between "
+            f"{MIN_SLIDES} and {MAX_SLIDES}."
+        )
 
-    # Quote is its own slot, independent of proof — a strong sourced quote
-    # is standalone evidence on its own merits, not something that needs a
-    # number alongside it to justify a slide. The anti-fabrication guard
-    # (Decision #56) already keeps weak/unsourced quotes out of
-    # available_quotes, so this condition doesn't need to double-guard
-    # against it (Decision #61).
-    if len(context.available_quotes) > 0:
-        candidates.append(SlotRole.quote)
+    quote_count = sum(1 for s in slides if s.role == SlotRole.quote)
+    if quote_count > MAX_QUOTE_SLIDES:
+        raise PlannerValidationError(
+            f"Carousel has {quote_count} dedicated quote slides; at most "
+            f"{MAX_QUOTE_SLIDES} allowed. Weave weaker quotes inline into "
+            "beat prose instead of giving them their own slide."
+        )
 
-    if _any_node_contains(nodes, CONTRAST_KEYWORDS):
-        candidates.append(SlotRole.contrast)
-
-    if context.domain in ("world", "ai_tech") and _any_node_contains(nodes, MECHANISM_KEYWORDS):
-        candidates.append(SlotRole.mechanism)
-
-    if context.domain in ("finance", "ai_tech") and _any_node_contains(nodes, CONCEPT_KEYWORDS):
-        candidates.append(SlotRole.concept)
-
-    # Proof and quote are purely additive (Decision #60) — each raises the
-    # cap by 1 rather than competing with structural slots for a fixed
-    # budget. Base 8, +1 if proof fired, +1 if quote fired: 8/9/9/10.
-    effective_cap = MAX_SLOTS
-    if SlotRole.proof in candidates:
-        effective_cap += 1
-    if SlotRole.quote in candidates:
-        effective_cap += 1
-
-    total = len(FIXED_SLOT_ROLES) + len(candidates)
-    if total > effective_cap:
-        excess = total - effective_cap
-        for role in DROP_PRIORITY:
-            if excess <= 0:
-                break
-            if role in candidates:
-                candidates.remove(role)
-                excess -= 1
-
-    present_roles = set(FIXED_SLOT_ROLES) | set(candidates)
-
-    slots = [
-        Slot(slot_id=role.value, role=role, is_optional=role not in NON_OPTIONAL_ROLES)
-        for role in SLOT_ORDER
-        if role in present_roles
-    ]
-
-    return SlotPlan(slots=slots)
+    numbers_slides = [s.slot_id for s in slides if s.dominant_numbers]
+    if numbers_slides:
+        raise PlannerValidationError(
+            "No dedicated numbers/fact-sheet slides allowed — found "
+            f"dominant_numbers populated on: {numbers_slides}. Weave "
+            "numbers into the beat's own prose instead."
+        )

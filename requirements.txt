@@ -16,3 +16,4 @@ PyYAML
 playwright
 Pillow
 Jinja2
+openai

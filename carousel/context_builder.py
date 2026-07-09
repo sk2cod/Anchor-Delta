@@ -6,8 +6,9 @@ LLM call.
 
 Two responsibilities:
 1. Python: trim and structure StoryCard fields into StoryContext
-2. LLM: one Haiku call to extract entities, numbers, and quotes
-   (Decision #07 — Haiku catches ~95% of entities vs ~70% for regex)
+2. LLM: two Haiku calls — one to extract entities, numbers, and quotes
+   (Decision #07 — Haiku catches ~95% of entities vs ~70% for regex),
+   one to derive the cover image's visual subject (Decision #64)
 
 Uses CAROUSEL_ANTHROPIC_API_KEY, not ANTHROPIC_API_KEY — a separate billing
 account from the Intelligence Engine pipeline (Decision #40).
@@ -71,6 +72,33 @@ Return this exact JSON structure:
 }
 
 Return empty arrays if nothing found. Never hallucinate."""
+
+# Decision #64 — a separate, single-purpose call from the extraction
+# above (not folded into EXTRACTION_SYSTEM_PROMPT): that prompt has
+# survived three tuning decisions (#07, #56, #59), and mixing a
+# differently-shaped new output into it risks regressing already-tuned
+# behaviour. Feeds carousel/image_generator.py's DALL-E prompt — the raw
+# entity label ("Ukraine", "Canada") produces generic/stereotyped
+# imagery unrelated to the specific story; this asks for the concrete,
+# story-specific detail a documentary filmmaker would actually put on
+# screen instead.
+VISUAL_SUBJECT_SYSTEM_PROMPT = """You are a documentary filmmaker deciding what to actually film for \
+this story. Identify the single most visually distinctive, story-specific \
+element you would put on screen — never a generic stand-in for the \
+country or company name (not "Russia", not "a submarine" in the \
+abstract), but the concrete detail unique to THIS story.
+
+If the story centres on a specific named individual as its main \
+character, the subject is that person (for a recognisable portrait).
+Otherwise, describe the specific object, place, or scene a documentary \
+would actually show — grounded in what this story is literally about.
+
+Return only valid JSON, no preamble, no markdown fences.
+
+{"visual_subject": "the specific visual subject, as a short descriptive phrase", \
+"is_person": true or false}
+
+Never leave visual_subject empty."""
 
 
 class ContextBuildError(Exception):
@@ -210,11 +238,38 @@ def _extract_entities_quotes_numbers(
         return [], [], []
 
 
+def _derive_visual_subject(
+    client: anthropic.Anthropic, card: StoryCard, text: str
+) -> tuple[str, bool]:
+    """
+    Decision #64 — one Haiku call deriving a story-specific DALL-E subject
+    for the cover image. Returns (visual_subject, is_person). Never
+    raises — falls back to umbrella_title (treated as not-a-person) on
+    any failure, same fallback pattern as _extract_entities_quotes_numbers.
+    """
+    try:
+        message = client.messages.create(
+            model=HAIKU_MODEL,
+            max_tokens=200,
+            system=VISUAL_SUBJECT_SYSTEM_PROMPT,
+            messages=[{"role": "user", "content": text}],
+        )
+        data = json.loads(_strip_json_fences(message.content[0].text))
+        visual_subject = (data.get("visual_subject") or "").strip()
+        if not visual_subject:
+            raise ValueError("empty visual_subject")
+        return visual_subject, bool(data.get("is_person", False))
+    except Exception as e:
+        logger.warning("Visual subject derivation failed, using umbrella_title: %s", e)
+        return card.umbrella_title, False
+
+
 def build_context(card: StoryCard) -> StoryContext:
     """
     Transform a StoryCard into a prompt-optimised StoryContext.
-    Makes one Haiku call for entity/number/quote extraction.
-    Cost: ~$0.005. Latency: ~1.5s.
+    Makes two Haiku calls: entity/number/quote extraction, and cover
+    image visual-subject derivation (Decision #64).
+    Cost: ~$0.006. Latency: ~2-3s.
     """
     api_key = os.environ.get("CAROUSEL_ANTHROPIC_API_KEY")
     if not api_key:
@@ -254,6 +309,7 @@ def build_context(card: StoryCard) -> StoryContext:
     client = anthropic.Anthropic(api_key=api_key)
     extraction_text = _extraction_input_text(card, latest_delta, transmission_summary)
     quotes, entities, numbers = _extract_entities_quotes_numbers(client, extraction_text)
+    visual_subject, visual_subject_is_person = _derive_visual_subject(client, card, extraction_text)
 
     return StoryContext(
         umbrella_title=card.umbrella_title,
@@ -266,4 +322,6 @@ def build_context(card: StoryCard) -> StoryContext:
         available_quotes=quotes,
         key_entities=entities,
         dominant_numbers=numbers,
+        visual_subject=visual_subject,
+        visual_subject_is_person=visual_subject_is_person,
     )

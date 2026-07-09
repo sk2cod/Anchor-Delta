@@ -12,6 +12,7 @@ Fonts self-hosted, no CDN at render time (Decision #10, #11). Renders at
 phones (Decision #09).
 """
 
+import hashlib
 import io
 import re
 from pathlib import Path
@@ -33,7 +34,7 @@ RENDER_HEIGHT = 2700
 FINAL_WIDTH = 1080
 FINAL_HEIGHT = 1350
 
-BRAND_VERSION = "1.9"  # bump when CSS changes, to invalidate the render cache
+BRAND_VERSION = "2.0"  # bump when CSS changes, to invalidate the render cache
 WORDMARK = "ANCHOR & DELTA"
 CTA_HANDLE = "@anchordelta"  # placeholder per Decision #29
 
@@ -92,6 +93,7 @@ def _build_variables(enriched_slide: EnrichedSlide, domain_label: str, page_indi
         "accent_colour": layout.accent_colour,
         "page_indicator": page_indicator,
         "wordmark": WORDMARK,
+        "handle": CTA_HANDLE,
     }
 
     if template_id in ("statement", "concept"):
@@ -101,9 +103,18 @@ def _build_variables(enriched_slide: EnrichedSlide, domain_label: str, page_indi
         variables["headline"] = slide.headline
         variables["emphasis_line"] = slide.body
     elif template_id == "cover":
-        variables["kicker"] = slide.kicker or ""
+        # Decision #64 — no kicker; body is now the completing sub-heading.
+        # image_asset.url is a local file path (carousel/image_generator.py);
+        # converted to a file:// URI here so Playwright's file-origin
+        # document (see _render_to_bytes) can load it directly, matching
+        # how fonts/base.css already resolve. Empty string when no image
+        # was generated — the template's own display:none fallback handles it.
         variables["headline_html"] = _build_body_html(slide.headline, slide.emphasis_word)
-        variables["sub_line"] = slide.body
+        variables["sub_heading"] = slide.body
+        variables["image_data_uri"] = (
+            Path(slide.image_asset.url).as_uri() if slide.image_asset else ""
+        )
+        variables["image_display"] = "block" if slide.image_asset else "none"
     elif template_id == "number":
         # Fact sheet (Decision #57) — up to 4 figures, not a single number.
         # The figure column shows the bare value only — label/context is
@@ -129,8 +140,7 @@ def _build_variables(enriched_slide: EnrichedSlide, domain_label: str, page_indi
         variables["date_label"] = _extract_date_label(slide.body)
         variables["headline"] = slide.headline
         variables["body_html"] = _build_body_html(slide.body, slide.emphasis_word)
-    elif template_id == "cta":
-        variables["handle"] = CTA_HANDLE
+    # cta's "handle" is now covered by the universal assignment above.
 
     return variables
 
@@ -138,6 +148,12 @@ def _build_variables(enriched_slide: EnrichedSlide, domain_label: str, page_indi
 def _cache_key(enriched_slide: EnrichedSlide) -> str:
     layout = enriched_slide.layout
     slide = enriched_slide.slide
+    # Decision #64 — distinguishes renders whose text is identical but
+    # whose AI-generated cover image differs (see cache.py:render_cache_key).
+    image_key = (
+        hashlib.md5(slide.image_asset.url.encode("utf-8")).hexdigest()[:12]
+        if slide.image_asset else ""
+    )
     return render_cache_key(
         template_id=layout.template_id.value,
         headline=slide.headline,
@@ -145,6 +161,7 @@ def _cache_key(enriched_slide: EnrichedSlide) -> str:
         accent=layout.accent_colour,
         theme=layout.theme_variant,
         brand_version=BRAND_VERSION,
+        image_key=image_key,
     )
 
 

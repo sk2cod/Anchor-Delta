@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1080">
+<style>
+  /* Standalone test chassis — duplicated from carousel/templates/base.css
+     and cover.html rather than linked, so this file has zero dependency
+     on the production template directory. Fonts are still the real
+     self-hosted files in carousel/fonts/ (read, not modified) so the
+     type treatment matches production exactly. */
+
+  @font-face {
+    font-family: 'Playfair Display';
+    font-style: normal;
+    font-weight: 700;
+    font-display: block;
+    src: url('../../../carousel/fonts/PlayfairDisplay-Bold.woff2') format('woff2');
+  }
+  @font-face {
+    font-family: 'Playfair Display';
+    font-style: normal;
+    font-weight: 900;
+    font-display: block;
+    src: url('../../../carousel/fonts/PlayfairDisplay-Black.woff2') format('woff2');
+  }
+  @font-face {
+    font-family: 'Inter';
+    font-style: normal;
+    font-weight: 400;
+    font-display: block;
+    src: url('../../../carousel/fonts/Inter-Regular.woff2') format('woff2');
+  }
+  @font-face {
+    font-family: 'Inter';
+    font-style: normal;
+    font-weight: 500;
+    font-display: block;
+    src: url('../../../carousel/fonts/Inter-Medium.woff2') format('woff2');
+  }
+
+  :root {
+    --canvas-width: 2160px;
+    --canvas-height: 2700px;
+    --bg-primary: #1A1612;
+    --text-primary: #E8E0D0;
+    --text-muted: #B0A898;
+    --text-footer: #4A4540;
+    --accent: {{ accent_hex }};
+    --pad-x: 72px;
+    --pad-y: 80px;
+    --font-display: 'Playfair Display', Georgia, serif;
+    --font-body: 'Inter', system-ui, sans-serif;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    width: var(--canvas-width);
+    height: var(--canvas-height);
+    overflow: hidden;
+    background: var(--bg-primary);
+  }
+
+  .slide {
+    position: relative;
+    width: var(--canvas-width);
+    height: var(--canvas-height);
+    overflow: hidden;
+    background: var(--bg-primary);
+  }
+
+  /* Chassis pieces reused verbatim from base.css/cover.html (same font
+     weights, same colours, same corner positions). */
+  .domain-tag {
+    position: absolute;
+    top: var(--pad-y);
+    left: var(--pad-x);
+    font-family: var(--font-body);
+    font-weight: 500;
+    font-size: 48px;
+    letter-spacing: 6px;
+    text-transform: uppercase;
+    color: var(--accent);
+    z-index: 4;
+  }
+
+  .footer {
+    position: absolute;
+    bottom: var(--pad-y);
+    left: var(--pad-x);
+    z-index: 4;
+  }
+
+  .page-indicator {
+    font-family: var(--font-body);
+    font-weight: 400;
+    font-size: 36px;
+    letter-spacing: 3px;
+    color: var(--text-footer);
+    text-transform: uppercase;
+  }
+
+  /* Handle — the @anchordelta handle, moved out of the footer to
+     top-right (mirrors .domain-tag's top-left placement), renamed from
+     the old "ANCHOR & DELTA" wordmark per explicit user request.
+     font-size matches .domain-tag (48px); font-weight and colour match
+     .sub-heading (400, --text-muted) per explicit user request. */
+  .handle {
+    position: absolute;
+    top: var(--pad-y);
+    right: var(--pad-x);
+    font-family: var(--font-body);
+    font-weight: 400;
+    font-size: 48px;
+    letter-spacing: 1px;
+    color: var(--text-muted);
+    z-index: 4;
+  }
+
+  /* 1. Full-bleed AI-generated, duotone-treated background image.
+     src is a base64 data URI substituted by the script — never an
+     external file path. Top-anchored (object-position: top center)
+     since generated subjects sit in the upper portion of the source.
+     display toggled by the script — "none" when generation failed,
+     giving a typography-only fallback on the plain --bg-primary. */
+  #bg-image {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: top center;
+    z-index: 1;
+  }
+
+  /* 2. Gradient overlay — image stays visible in the upper ~40%, ramps
+     through the middle, fully opaque by 85% down, so the lower text
+     zone is always dark regardless of image content. */
+  .gradient-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    background: linear-gradient(
+      to bottom,
+      rgba(26, 22, 18, 0) 0%,
+      rgba(26, 22, 18, 0.4) 40%,
+      rgba(26, 22, 18, 0.85) 60%,
+      rgba(26, 22, 18, 0.98) 75%,
+      rgba(26, 22, 18, 1.0) 85%
+    );
+  }
+
+  /* 3. Content block — fixed absolute position starting at 60% down
+     the canvas (1620px of 2700px), not an optically-centred band.
+     No kicker above the headline. Wide 85%-canvas measure (much wider
+     than cover.html's own 1050px) so the same 180px production font
+     size has more room per line here. text-align: center only —
+     never justify-content: space-between (DESIGN_LESSONS anti-pattern,
+     breaks with variable-length content). */
+  .content {
+    position: absolute;
+    top: 1620px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 85%;
+    text-align: center;
+    z-index: 3;
+  }
+
+  .headline {
+    font-family: var(--font-display);
+    font-weight: 900;
+    font-size: 180px;
+    line-height: 1.0;
+    color: var(--text-primary);
+  }
+
+  .rule {
+    width: 40px;
+    height: 2px;
+    background: var(--accent);
+    opacity: 0.3;
+    margin: 32px auto 0 auto;
+  }
+
+  /* Sub-heading — re-introduced (spec.md Phase A). Visually subordinate
+     to the headline: same body font treatment as cover.html's own
+     sub-line (Inter 400, --text-muted), sized up 2 units (56px -> 60px)
+     per explicit user request, sitting below the rule rather than as
+     part of the headline's own visual weight. */
+  .sub-heading {
+    font-family: var(--font-body);
+    font-weight: 400;
+    font-size: 60px;
+    line-height: 1.4;
+    color: var(--text-muted);
+    margin-top: 32px;
+  }
+
+  /* Swipe indicator — moved into the content flow (sits below the
+     sub-heading, in normal document flow, rather than a fixed
+     bottom:210px absolute position) so it's never crowded/clipped by a
+     longer sub-heading. Styled to match .domain-tag exactly (same
+     font-size, same accent colour) per explicit user request. */
+  .swipe {
+    font-family: var(--font-body);
+    font-weight: 500;
+    font-size: 48px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-top: 32px;
+  }
+</style>
+</head>
+<body>
+<div class="slide">
+
+  <img id="bg-image" src="{{ image_data_uri }}" style="display:{{ image_display }};">
+
+  <div class="gradient-overlay"></div>
+
+  <div class="domain-tag">{{ domain_tag }}</div>
+
+  <div class="handle">@anchordelta</div>
+
+  <div class="content">
+    <h1 class="headline">{{ headline }}</h1>
+    <div class="rule"></div>
+    <p class="sub-heading">{{ sub_heading }}</p>
+    <div class="swipe">Swipe &rarr;</div>
+  </div>
+
+  <footer class="footer">
+    <span class="page-indicator">{{ slide_label }}</span>
+  </footer>
+
+</div>
+</body>
+</html>

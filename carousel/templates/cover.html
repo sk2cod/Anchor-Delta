@@ -8,42 +8,72 @@
     /* accent override — set by caller per domain */
     .slide { --accent: {{ accent_colour }}; }
 
-    /* Optical-centre composition: content-wrapper's shared top/bottom
-       padding is overridden locally (same pattern statement.html/hook.html
-       use for --measure) so the band's own midpoint sits ~46% from the
-       top of the canvas rather than the shared chassis default (~53%) —
-       poster-balanced, not sunk. justify-content: center (not
-       space-between — DESIGN_LESSONS "space-between breaks short
-       content") keeps the block's optical centre stable at that offset
-       regardless of copy length. Narrow measure forces the same dramatic
-       short-line wrap as the interior hook. */
-    .content-wrapper {
-      --content-top: 200px;
-      --content-bottom: 416px;
+    /* Rebuilt Decision #64 — image-forward layout, replacing the
+       typography-only optically-centred composition this template used
+       under Decision #53. Validated over several rounds in
+       tests/carousel/test_new_cover.html before promotion; this file
+       differs from that reference in exactly one place (the sub-heading
+       stays inside a Jinja if-guard — see below) and otherwise matches
+       it. Do NOT use justify-content: space-between anywhere here
+       (DESIGN_LESSONS anti-pattern — breaks with variable-length
+       content). */
+
+    /* 1. Full-bleed AI-generated, duotone-treated background image
+       (carousel/image_generator.py). src is a file:// URI built by
+       renderer.py from image_asset's local file path — never inline
+       base64. Top-anchored (object-position: top center) since
+       generated subjects sit in the upper portion of the source.
+       display toggled by renderer.py — "none" when generation failed,
+       giving a typography-only fallback on the plain --bg-primary. */
+    #bg-image {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: top center;
+      z-index: 1;
     }
 
+    /* 2. Gradient overlay — image stays visible in the upper ~40%,
+       ramps through the middle, fully opaque by 85% down, so the lower
+       text zone is always dark regardless of image content. */
+    .gradient-overlay {
+      position: absolute;
+      inset: 0;
+      z-index: 2;
+      background: linear-gradient(
+        to bottom,
+        rgba(26, 22, 18, 0) 0%,
+        rgba(26, 22, 18, 0.4) 40%,
+        rgba(26, 22, 18, 0.85) 60%,
+        rgba(26, 22, 18, 0.98) 75%,
+        rgba(26, 22, 18, 1.0) 85%
+      );
+    }
+
+    /* 3. Content block — fixed absolute position starting at 60% down
+       the canvas (1620px of 2700px), not the shared content-wrapper's
+       optically-centred band technique. No kicker above the headline
+       (Decision #64 — the Cover template no longer renders one). Wide
+       85%-canvas measure (much wider than the old 1050px) so the
+       180px headline has more room per line at this position. */
     .content {
-      --measure: 1050px;
-      justify-content: center;
-    }
-
-    .kicker {
-      font-family: var(--font-body);
-      font-weight: 500;
-      font-size: 44px;
-      letter-spacing: 5px;
-      text-transform: uppercase;
-      color: var(--accent);
-      margin-bottom: var(--gap-md);
+      position: absolute;
+      top: 1620px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 85%;
+      text-align: center;
+      z-index: 3;
     }
 
     .headline {
       font-family: var(--font-display);
       font-weight: 900;
       font-size: 180px;
-      line-height: 0.98;
+      line-height: 1.0;
       color: var(--text-primary);
-      letter-spacing: -2px;
     }
 
     .headline .accent {
@@ -52,52 +82,87 @@
       font-weight: 700;
     }
 
-    .sub-line {
-      font-family: var(--font-body);
-      font-weight: 400;
-      font-size: 56px;
-      line-height: 1.5;
-      color: var(--text-muted);
-      margin-bottom: var(--gap-lg);
+    /* Local override of the shared base.css .rule (width:100%) — this
+       template's rule is a short fixed-width divider, not a full-width
+       column rule. Safe to override locally: each template renders as
+       an isolated document, no cross-template leakage. */
+    .rule {
+      width: 40px;
+      height: 2px;
+      background: var(--accent);
+      opacity: 0.3;
+      margin: 32px auto 0 auto;
     }
 
-    /* Not part of the centred content group — stays absolutely positioned
-       and outside the content flex container, dropped slightly lower so
-       it clears the sub-line without crowding it, still well above the
-       footer. Calibrated against this template's actual content band
-       (--content-top/--content-bottom above) for the Strait of Hormuz
-       reference render. */
+    /* Sub-heading — completes the headline (Decision #64), visually
+       subordinate: Inter 400, --text-muted. */
+    .sub-heading {
+      font-family: var(--font-body);
+      font-weight: 400;
+      font-size: 60px;
+      line-height: 1.4;
+      color: var(--text-muted);
+      margin-top: 32px;
+    }
+
+    /* Swipe indicator — in normal document flow below the sub-heading
+       (not a fixed bottom offset — that crowded/clipped against longer
+       sub-heading text during validation). Styled to match .domain-tag
+       exactly: same font-size, same accent colour. */
     .swipe {
-      position: absolute;
-      right: var(--pad-x);
-      top: 1804px;
       font-family: var(--font-body);
       font-weight: 500;
-      font-size: 36px;
+      font-size: 48px;
       letter-spacing: 2px;
       text-transform: uppercase;
-      color: #8A8078;
+      color: var(--accent);
+      margin-top: 32px;
+    }
+
+    /* Handle — replaces the old bottom-right wordmark. Mirrors
+       .domain-tag's top-left placement on the right. Font-size matches
+       .domain-tag (48px); font-weight and colour match .sub-heading
+       (400, --text-muted). */
+    .handle {
+      position: absolute;
+      top: var(--pad-y);
+      right: var(--pad-x);
+      font-family: var(--font-body);
+      font-weight: 400;
+      font-size: 48px;
+      letter-spacing: 1px;
+      color: var(--text-muted);
+      z-index: 4;
+    }
+
+    .domain-tag,
+    .footer {
+      z-index: 4;
     }
   </style>
 </head>
 <body>
 <div class="slide">
-  <div class="domain-tag">{{ domain_label }}</div>
-  <div class="content-wrapper">
-    <div class="content">
-      {% if kicker %}<div class="kicker">{{ kicker }}</div>{% endif %}
-      <h1 class="headline">{{ headline_html }}</h1>
-      <div class="rule"></div>
-      {% if sub_line %}<p class="sub-line">{{ sub_line }}</p>{% endif %}
-    </div>
-  </div>
 
-  <div class="swipe">Swipe &rarr;</div>
+  <img id="bg-image" src="{{ image_data_uri }}" style="display:{{ image_display }};">
+
+  <div class="gradient-overlay"></div>
+
+  <div class="domain-tag">{{ domain_label }}</div>
+
+  <div class="handle">{{ handle }}</div>
+
+  <div class="content">
+    <h1 class="headline">{{ headline_html }}</h1>
+    <div class="rule"></div>
+    {% if sub_heading %}<p class="sub-heading">{{ sub_heading }}</p>{% endif %}
+    <div class="swipe">Swipe &rarr;</div>
+  </div>
 
   <footer class="footer">
     <span class="page-indicator">{{ page_indicator }}</span>
-    <span class="wordmark">{{ wordmark }}</span>
   </footer>
+
 </div>
 </body>
 </html>

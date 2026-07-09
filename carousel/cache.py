@@ -36,12 +36,18 @@ def render_cache_key(
     accent: str,
     theme: str,
     brand_version: str = "1.0",
+    image_key: str = "",
 ) -> str:
     """
     Stable cache key for rendered slide PNGs.
     brand_version invalidates all renders when CSS changes.
+    image_key (Decision #64) distinguishes renders whose text is
+    identical but whose AI-generated cover image differs — without it,
+    two hook-slide generations with the same (now word-capped, more
+    repeat-prone) headline/sub_heading text but a different image would
+    silently reuse a stale cached PNG, image content included.
     """
-    raw = "|".join([template_id, headline, body, accent, theme, brand_version])
+    raw = "|".join([template_id, headline, body, accent, theme, brand_version, image_key])
     return hashlib.md5(raw.encode("utf-8")).hexdigest()
 
 

@@ -140,6 +140,12 @@ class StoryContext(BaseModel):
     available_quotes: list[SourcedQuote] = Field(default_factory=list)
     key_entities: list[Entity] = Field(default_factory=list)
     dominant_numbers: list[DominantNumber] = Field(default_factory=list)
+    # Decision #64 — the cover image's DALL-E subject, derived separately
+    # from key_entities (a "documentary filmmaker" framing, not a bare
+    # entity label) so generated imagery is story-specific rather than a
+    # generic stand-in for the country/company name.
+    visual_subject: str = ""
+    visual_subject_is_person: bool = False
 
 
 # ---------------------------------------------------------------------------
@@ -148,7 +154,14 @@ class StoryContext(BaseModel):
 
 
 class SlotRole(str, Enum):
-    """Structural role a slide plays within the carousel (Decision #13)."""
+    """Structural role a slide plays within the carousel (Decision #13).
+
+    setup/event/pivot/mechanism/concept/proof/contrast are retired as of
+    Decision #67 (narrative-driven pipeline) — kept here only so old
+    persisted CarouselSpec rows in Supabase still deserialize correctly
+    (Pydantic's strict enum validation would fail to load them otherwise).
+    New generations never produce these; they collapse into `beat`.
+    """
 
     hook = "hook"
     setup = "setup"
@@ -161,10 +174,15 @@ class SlotRole(str, Enum):
     contrast = "contrast"
     payoff = "payoff"
     cta = "cta"
+    beat = "beat"  # generic flowing-narrative story beat — Decision #67
 
 
 class Slot(BaseModel):
-    """One planned slide position, assigned deterministically by CarouselPlanner."""
+    """One planned slide position, assigned deterministically by CarouselPlanner.
+
+    Superseded by Decision #67 (narrative-driven pipeline) — write_carousel()
+    no longer takes a pre-built SlotPlan. Left in place, unused, rather than
+    deleted, in case anything downstream still constructs one."""
 
     slot_id: str  # stable role-based id, e.g. "hook", "timeline_1"
     role: SlotRole
@@ -172,18 +190,25 @@ class Slot(BaseModel):
 
 
 class SlotPlan(BaseModel):
-    """The deterministic slot structure the writer fills (Decision #13)."""
+    """The deterministic slot structure the writer used to fill (Decision #13).
+    Superseded by Decision #67 — see Slot's docstring."""
 
     slots: list[Slot]
 
 
 # ---------------------------------------------------------------------------
-# 4. ImageAsset — forward-compatibility seam for v1.5
+# 4. ImageAsset — cover slide background image (Decision #64)
 # ---------------------------------------------------------------------------
 
 
 class ImageAsset(BaseModel):
-    """SEAM v1.5 — portrait template support. Inert until v1.5 ships."""
+    """An AI-generated (or future wikimedia/upload-sourced) image attached
+    to a slide. Originally a forward-compatibility seam for a v1.5 portrait
+    template; now actively used by the Cover template's AI-generated,
+    duotone-treated background image (Decision #64). url is a local file
+    path (carousel/image_generator.py saves to outputs/cover_images/),
+    never an inline base64 blob — kept out of the persisted CarouselSpec
+    jsonb column, which nothing needs at query time."""
 
     source: Literal["wikimedia", "upload", "ai_generated"]
     url: str

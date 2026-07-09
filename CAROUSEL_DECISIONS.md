@@ -1066,6 +1066,297 @@ gap no longer resets the field to null.
 
 ---
 
+## #64 — New cover format promoted to production: AI image, punchy one-line headline + sub-heading
+
+**Date:** 2026-07-09
+**Decision:** The image-forward cover format iteratively built and
+validated in `tests/carousel/test_new_cover.py` / `test_new_cover.html`
+this session (real Supabase cards, real Sonnet/Haiku/gpt-image-1 calls,
+several rounds of user-approved visual/copy tuning) is promoted to the
+live pipeline — including real AI image generation, per explicit user
+confirmation, not just the layout/copy changes.
+
+**What changed:**
+- `carousel/prompts/writer_v1_7.md` (new — `writer_v1_5.md` untouched,
+  Decision #08): the old 4-pattern Hook Taxonomy (two of whose patterns
+  were literally two-sentence structures) replaced by Hook Rules — one
+  line, ≤8 words, names the specific subject, states the surprise
+  directly, no colon/two-sentence, plus a new Sub-Heading Rules section
+  (one sentence, ≤15 words, completes not repeats). Kicker removed from
+  the hook slot entirely. `carousel/writer.py`'s `PROMPT_PATH` →
+  `writer_v1_7.md`, default `prompt_version` → `"writer-v1.7"`.
+- `carousel/prompts/regenerate_v1_3.md` (new — `regenerate_v1_2.md`
+  untouched): "Cover-copy sub-rule" updated to match — 2-piece output,
+  no kicker. `REGEN_PROMPT_PATH` → `regenerate_v1_3.md`, default
+  `prompt_version` → `"regenerate-v1.3"`.
+- `carousel/image_generator.py` (new): `generate_cover_image()` —
+  `gpt-image-1` (`quality="high"`, bounded `timeout=45.0`) + duotone
+  treatment (brand shadow → domain accent, with a gamma-0.7 brightness
+  lift validated during the test phase), saves to
+  `outputs/cover_images/{uuid}.png`, returns an `ImageAsset` or `None`.
+  Never raises — a failure just leaves the cover typography-only,
+  matching the Decision #54/#56/#63 "never crash on a soft dependency"
+  philosophy. `write_carousel()` calls this internally, after the
+  Sonnet call succeeds, attaching the result to the hook slide before
+  returning — `ui/app.py`'s call site needed zero changes.
+- `carousel/context_builder.py`: new `_derive_visual_subject()` Haiku
+  call — a "documentary filmmaker" framing that identifies the concrete,
+  story-specific visual subject (e.g. "a Ukrainian drone approaching a
+  Russian oil refinery," not just "Ukraine") for the DALL-E prompt.
+  Deliberately a separate call from the existing entity/quote/number
+  extraction (Decisions #07/#56/#59), not folded into it — that
+  extraction has survived three tuning rounds and mixing in a
+  differently-shaped new output risked regressing it. `StoryContext`
+  gains `visual_subject`/`visual_subject_is_person` (`carousel/models.py`).
+- `carousel/templates/cover.html` rebuilt: full-bleed AI image (`file://`
+  URI, never inline base64), gradient overlay, content fixed at 60% down
+  (replacing the `--content-top`/`--content-bottom` band technique),
+  180px headline (unchanged size), 60px sub-heading, 48px swipe styled
+  like the domain tag and moved into normal flow below the sub-heading
+  (was crowding a fixed `top:1804px` position against longer
+  sub-heading text), new top-right `@anchordelta` handle replacing the
+  old bottom-right wordmark. Sub-heading kept inside a
+  `{% if sub_heading %}` guard — the one deliberate difference from the
+  test template — since `ui/carousel_view.py`'s inline-edit path can
+  blank the body text with no validation, and only a template-level
+  guard covers that path.
+- `carousel/writer.py`'s `regenerate_slide()`: preserves the hook
+  slide's `image_asset` unchanged across a text-only regenerate (same
+  pattern as kicker/quote preservation in Decisions #54/#63); the old
+  kicker-null guard replaced with a stronger one — raises
+  `CarouselWriteError` if a hook regenerate returns an empty
+  sub-heading, since it's now load-bearing narrative content, not
+  decoration.
+- Two bugs caught by a Plan-agent review before implementation, both
+  resolved by construction rather than patched after the fact:
+  (1) render-cache staleness — `carousel/cache.py`'s
+  `render_cache_key()` gained an `image_key` param, hashed in by
+  `renderer.py`'s `_cache_key()`, so two generations with identical
+  (now word-capped, more repeat-prone) headline/sub_heading text but a
+  different AI image no longer silently reuse a stale cached PNG;
+  (2) Supabase JSONB bloat — `ImageAsset.url` is a local file path, not
+  an inline base64 blob, so the persisted `CarouselSpec` stays small
+  (confirmed: 6.4KB for a real 9-slide carousel) with no changes needed
+  to `carousel/assembler.py` or `db/carousel_queries.py`.
+- `BRAND_VERSION` (`carousel/renderer.py`) `"1.9"` → `"2.0"` — a
+  structural template overhaul, not an incremental CSS tweak.
+**Why:** Every visual and copy decision was independently validated in
+isolation against real cards over several rounds this session before
+being asked to promote; the two-sentence/colon-twist headline patterns
+and the missing sub-heading were named, concrete readability problems
+(`spec.md`, "Cover Slide Overhaul — Phase A"), and the generic
+entity-label DALL-E prompting produced stereotyped imagery unrelated to
+the specific story — all three fixed and confirmed working before this
+promotion.
+**Explicitly out of scope:** `regenerate_slide()` (Model B) does not
+gain image-regeneration capability — text-only, image always preserved.
+**Verified end-to-end** against a real Supabase card through the exact
+production call sequence (`build_context` → `plan_carousel` →
+`write_carousel` → `pick_layouts` → `render_carousel` →
+`assemble_carousel`): `visual_subject` populated correctly;
+`write_carousel()`'s image-generation call hit a real OpenAI billing
+hard limit (from this session's cumulative test image generations, not
+a code defect) and correctly caught it, logged a warning, left
+`image_asset=None`, and the carousel still generated and rendered all
+9 slides cleanly with a typography-only cover — a genuine, unplanned
+real-world confirmation that the fallback path works, not just a
+simulated one. Separately confirmed: the render-cache fix produces
+distinct keys for identical text with different/absent images; the
+image-generation module itself (`generate_cover_image()`) succeeds in
+isolation, producing a real duotoned image file; the rebuilt
+`cover.html` renders correctly end-to-end via Playwright with a real
+generated image (domain tag, handle, headline with emphasis word, rule,
+sub-heading, swipe all correct); `regenerate_slide()` preserves
+`image_asset` unchanged on a hook regenerate and correctly raises
+(feeding the existing one-retry mechanism) when the model returns an
+empty sub-heading. `git status` confirms changes confined to the files
+listed above — no other template, and no production file outside this
+list, touched.
+**Status:** Active.
+
+---
+
+## #65 — Strip narrative dates from body prose
+
+**Date:** 2026-07-09
+**Decision:** The writer stops writing "On July 7..." / "Last
+Tuesday..." style datelines into setup/pivot/mechanism/concept/
+contrast/payoff body prose. If timing matters, it's framed relatively
+("just", "this week", "last month", "days after"), never as a bare
+calendar date. `carousel/prompts/writer_v1_8.md` (new — `writer_v1_7.md`
+untouched, Decision #08): a new "No narrative dates" Brand Voice
+sub-rule, plus a one-line summary added to Hard Constraints > Structural
+rules. `carousel/writer.py`'s `PROMPT_PATH` → `writer_v1_8.md`, default
+`prompt_version` → `"writer-v1.8"`. Extended to the targeted-regenerate
+path (Model B) so a single-slide regenerate can't reintroduce a
+narrative date the full writer would now avoid:
+`carousel/prompts/regenerate_v1_4.md` (new — `regenerate_v1_3.md`
+untouched), same rule plus the same event-slot exception added to its
+brand-voice summary list. `REGEN_PROMPT_PATH` → `regenerate_v1_4.md`,
+default `prompt_version` → `"regenerate-v1.4"`.
+**Why:** A specific calendar date reads like a dateline, not a story —
+and it drops out of a reader's head the moment they screenshot or
+reshare a slide days or weeks later. Relative framing stays legible
+regardless of when the post is actually seen.
+**Scope note — event slot is the deliberate exception:** the event
+slot's `## event` guide already instructs a real "Month Day, Year"
+date, because `carousel/renderer.py`'s `_extract_date_label()` parses
+one out of `slide.body` (never `slide.headline`) to populate the
+timeline template's separate date-tag element. This rule explicitly
+carves that slot out.
+**Bug found and fixed while verifying this change:** the pre-existing
+`## event` guide's "≤10 words headline + date label" phrasing was
+genuinely ambiguous about *where* the date should go, and a live test
+run against a real card (Space Force / Victus Haze) proved it out —
+the model wrote the date into the headline ("...— July 3, 2026")
+instead of body. Since `_extract_date_label()` only ever reads body,
+`date_label` would have rendered empty on that timeline slide — a
+latent bug that predates this decision, now surfaced and fixed by
+rewording the event guide to state unambiguously that the date belongs
+in body, mid-sentence, never as a headline suffix or a leading dateline
+opener (which would have contradicted the new no-narrative-dates rule
+this same decision adds).
+**Verified end-to-end** against a real Supabase card
+(9783c332-aedf-4b05-8311-e41694845225, Space Force/Victus Haze, 9
+slides): setup/pivot/contrast/payoff bodies confirmed free of narrative
+dates, with pivot and payoff naturally using "just" for relative timing
+exactly as the rule intends; event slide re-verified after the fix —
+date now lands in body and `_extract_date_label()` correctly extracts
+it. `regenerate_slide()` separately verified on the setup slot with an
+instruction explicitly nudging toward a date mention ("mention when
+the Space Force was created") — result used "launched in 2019" (a bare
+founding year, not a narrative dateline), confirming the rule holds
+under the regenerate path too.
+**Status:** Active.
+
+---
+
+## #66 — Introduce non-obvious entities on first mention, anchor on repeat
+
+**Date:** 2026-07-09
+**Decision:** The writer gives every non-obvious entity (company, agency,
+strategist, startup, private equity firm, named analyst) a one-phrase
+identifier the first time it's named — not a full explanation, just
+enough to orient the reader instantly. Every mention after that gets a
+short anchor back to who they are ("the strategist", "the startup") —
+never a bare surname or acronym floating with no context several slides
+later. Household names (Google, Apple, NATO, Russia) need no
+introduction. `carousel/prompts/writer_v1_9.md` (new — `writer_v1_8.md`
+untouched, Decision #08): new "Introduce non-obvious entities" Brand
+Voice sub-rule, plus a Hard Constraints summary line.
+`carousel/writer.py`'s `PROMPT_PATH` → `writer_v1_9.md`, default
+`prompt_version` → `"writer-v1.9"`.
+**Why:** Surfaced directly from user review of the flowing-narrative
+mockups (see `carousel_narrative_mockups.md`) — "Rheinmetall builds
+tanks. That's now a problem." gives a non-expert reader zero context
+(a country? a program? a person?), and a strategist introduced by name
+and title on slide 5 reads as a bare surname by slide 7, several beats
+after the reader would have forgotten who they are. The account's whole
+value proposition is intelligence and specificity delivered to a
+non-expert audience — an unintroduced or un-anchored name breaks that
+exact promise mid-carousel.
+**Verified end-to-end** against a real Supabase card (the Canada
+submarine deal / finance card): the event slide correctly introduced
+both "TKMS, a German-Norwegian defence consortium" and "Hanwha Ocean,
+South Korea's leading shipbuilder" on first mention, unprompted.
+**Status:** Active.
+
+---
+
+## #67 — Narrative-driven pipeline: writer decides shape, planner validates it after the fact
+
+**Date:** 2026-07-09
+**Decision:** Inverted the pipeline's core discipline. Before this
+decision, `carousel/planner.py` decided slide count and role
+deterministically in Python *before* the writer ran (Decision #03/#13 —
+"the LLM never decides slide count or structure"), via keyword-matching
+against the transmission's nodes, and the writer filled exactly that
+pre-built slot plan. As of this decision, the writer reads the full
+`StoryContext` itself and decides the carousel's own narrative shape —
+how many beats it needs, where a quote or a number earns its own slide —
+and `planner.py` validates the result afterward instead of dictating it
+beforehand.
+
+`SlotRole` gains a 12th member, `beat` — a generic flowing-narrative
+story beat. The 7 structural roles it replaces (setup, event, pivot,
+mechanism, concept, proof, contrast) are retired from new generations
+but kept on the enum unchanged, since old persisted `CarouselSpec` rows
+in Supabase still use those exact string values and Pydantic's strict
+enum validation would fail to deserialize them otherwise. `hook`,
+`quote`, and `cta` remain in active use exactly as before.
+
+`carousel/planner.py` is fully rewritten: `plan_carousel()` and its
+keyword-matching/`DROP_PRIORITY`/`SLOT_ORDER` machinery are removed,
+replaced by `validate_carousel_shape(spec)` — a deterministic
+post-write check (same "deterministic Python judgment, not LLM
+self-verification" philosophy as the Decision #56 quote-fabrication
+guard) enforcing: first slide is `hook`, last is `cta`, total count is
+5–10 (5 is the user's stated minimum — no padding; 10 is Instagram's
+actual platform limit on carousel media items, not an arbitrary
+number), at most 2 dedicated `quote`-role slides, and zero slides with
+populated `dominant_numbers` (hard-blocking the retired proof/fact-sheet
+slot as code, not just a prompt instruction).
+
+New prompt `carousel/prompts/writer_v2_0.md` (`writer_v1_9.md`
+untouched, Decision #08) — version jump to 2.0, not 1.10, matching the
+Decision #64 precedent for a structurally different prompt. Brand
+Voice, Hook Rules, Domain Vocabularies, and Caption/Pinned
+Comment/Hashtag rules carry over unchanged. The old 11-section
+`# Slot-Role Writing Guides` is replaced by one `# Story Arc & Beat
+Writing Guide`: the writer reads the transmission's nodes as a natural
+but non-binding map, finds the story's actual shape, writes each beat's
+headline+body as one continuous thought that answers the previous
+beat's question and raises the next one, lands numbers inline in the
+sentence that needs them, and defaults quotes to inline prose unless
+one is strong enough to stand alone as its own beat. Word budget for
+`beat`: ≤14 words headline, ≤40 words body (widened from the old
+25-word cap — a beat carrying an inline number or quote clause needs
+more room than an isolated statement did).
+
+`carousel/writer.py`: `PROMPT_PATH` → `writer_v2_0.md`, default
+`prompt_version` → `"writer-v2.0"`. `write_carousel()` drops its
+`slot_plan` parameter — `_build_user_message()` no longer builds a
+`SLOT PLAN` section. `_build_spec_from_response()` now calls
+`planner.validate_carousel_shape(spec)` alongside the existing
+quote-fabrication check, feeding the same one-retry mechanism on
+failure. `regenerate_slide()` and `_attach_cover_image()` needed no
+logic changes — both already worked generically via `SlotRole.hook`/
+`SlotRole.quote` checks that remain valid for `beat`-role slides.
+
+`ui/app.py`'s carousel-generation call site drops the
+`plan_carousel(context)` call and the `plan` argument to
+`write_carousel()` — the one call site that could not stay untouched,
+since the whole point is inverting who decides structure.
+
+No template, `layout_picker.py`, `assembler.py`, or `ui/carousel_view.py`
+changes were needed: `layout_picker.py`'s existing content-signal
+fallthrough (`cta`→cta, `hook`→cover, has quote→quote, else→statement)
+already routes a `beat`-role slide with no quote straight to
+`statement.html`, which already serves as a generic flowing-prose
+template. `ui/carousel_view.py`'s `ROLE_ABBREV` already falls back
+gracefully for an unrecognized role string.
+**Why:** Viewer feedback was that carousels built from a fixed slot
+structure read as disconnected facts, not a story — each slide standing
+alone, numbers and quotes parked on isolated slides instead of landing
+where they matter. `carousel_narrative_mockups.md` (the hand-written
+mockup exercise validated against explicit user feedback on entity
+introduction, name-anchoring, and regional-angle compression) proved
+the target shape works; this decision makes the real pipeline produce
+that shape directly instead of leaving the mockups a one-off exercise.
+The user explicitly chose to relax Decision #03/#13's original
+determinism guarantee in exchange for a carousel that actually flows,
+on the condition that a deterministic safety net still validates the
+result rather than trusting the LLM to self-certify its own shape.
+**Note:** the user referred to this as "Decision #65" when requesting
+it, but #65 and #66 were already taken by the narrative-dates and
+entity-introduction decisions earlier in this same session — using the
+correct next number here rather than silently renumbering or creating
+a conflicting duplicate #65.
+**Status:** Active — pending end-to-end verification against a real
+Supabase card (in progress).
+
+---
+
 ## Open questions to revisit
 
 - **Anonymous handle name.** Pending account creation.
@@ -1149,3 +1440,28 @@ gap no longer resets the field to null.
   slot (Model B), same pattern as Decision #54's kicker fix. New
   `regenerate_v1_2.md` (`regenerate_v1_1.md` untouched); `writer.py`
   passes/validates `Slide.quote` on regenerate instead of losing it.
+- 2026-07-09: Decision #64 added — new image-forward cover format
+  promoted to production from `tests/carousel/`: AI-generated duotone
+  image, punchy one-line headline + completing sub-heading, kicker
+  removed. New `writer_v1_7.md`, `regenerate_v1_3.md`,
+  `carousel/image_generator.py`. `cover.html` rebuilt.
+  `BRAND_VERSION` → `"2.0"`.
+- 2026-07-09: Decision #65 added — writer stops writing narrative
+  dates ("On July 7...") into body prose; relative framing ("just",
+  "this week") instead. New `writer_v1_8.md` (`writer_v1_7.md`
+  untouched). Also fixed a latent bug found while verifying: the
+  event slot's date was landing in headline, not body, so
+  `_extract_date_label()` never found it. Extended to the regenerate
+  path: new `regenerate_v1_4.md` (`regenerate_v1_3.md` untouched).
+- 2026-07-09: Decision #66 added — non-obvious entities get a one-phrase
+  identifier on first mention, a short anchor on every repeat mention.
+  New `writer_v1_9.md` (`writer_v1_8.md` untouched). Surfaced from user
+  review of `carousel_narrative_mockups.md`.
+- 2026-07-09: Decision #67 added — narrative-driven pipeline. Writer
+  decides carousel shape itself instead of filling a pre-built slot
+  plan; `planner.py` rewritten from `plan_carousel()` to
+  `validate_carousel_shape()`, a post-write deterministic check.
+  `SlotRole` gains `beat`; 7 structural roles retired from new
+  generations, kept on the enum for old Supabase rows. New
+  `writer_v2_0.md`. `writer.py` and `ui/app.py` updated to drop
+  `slot_plan`.

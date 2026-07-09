@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1080">
+<style>
+  /* Standalone test chassis — duplicated from carousel/templates/base.css
+     and cover.html rather than linked, so this file has zero dependency
+     on the production template directory (Decision-agnostic: this is a
+     test-only prototype, not a numbered production decision). Fonts are
+     still the real self-hosted files in carousel/fonts/ (read, not
+     modified) so the type treatment matches production exactly. */
+
+  @font-face {
+    font-family: 'Playfair Display';
+    font-style: normal;
+    font-weight: 700;
+    font-display: block;
+    src: url('../../../carousel/fonts/PlayfairDisplay-Bold.woff2') format('woff2');
+  }
+  @font-face {
+    font-family: 'Playfair Display';
+    font-style: normal;
+    font-weight: 900;
+    font-display: block;
+    src: url('../../../carousel/fonts/PlayfairDisplay-Black.woff2') format('woff2');
+  }
+  @font-face {
+    font-family: 'Inter';
+    font-style: normal;
+    font-weight: 400;
+    font-display: block;
+    src: url('../../../carousel/fonts/Inter-Regular.woff2') format('woff2');
+  }
+  @font-face {
+    font-family: 'Inter';
+    font-style: normal;
+    font-weight: 500;
+    font-display: block;
+    src: url('../../../carousel/fonts/Inter-Medium.woff2') format('woff2');
+  }
+
+  :root {
+    --canvas-width: 2160px;
+    --canvas-height: 2700px;
+    --bg-primary: #1A1612;
+    --text-primary: #E8E0D0;
+    --text-muted: #B0A898;
+    --text-footer: #4A4540;
+    --accent: {{ accent_hex }};
+    --pad-x: 72px;
+    --pad-y: 80px;
+    --gap-md: 32px;
+    --rule-opacity: 0.40;
+    --font-display: 'Playfair Display', Georgia, serif;
+    --font-body: 'Inter', system-ui, sans-serif;
+
+    /* Bottom-anchored content band (this template's own composition —
+       cover.html centres its band at --content-top:200px/--content-bottom:416px,
+       ~46% down the canvas; this template pushes the same technique
+       lower, ~60-65% down, since the image fills the upper portion and
+       text must sit inside the gradient-darkened bottom zone instead). */
+    --content-top: 1650px;
+    --content-bottom: 260px;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    width: var(--canvas-width);
+    height: var(--canvas-height);
+    overflow: hidden;
+    background: var(--bg-primary);
+  }
+
+  .slide {
+    position: relative;
+    width: var(--canvas-width);
+    height: var(--canvas-height);
+    overflow: hidden;
+    background: var(--bg-primary);
+  }
+
+  /* Chassis pieces reused verbatim from base.css (Decision-locked visual
+     system: same font weights, same colours, same corner positions). */
+  .domain-tag {
+    position: absolute;
+    top: var(--pad-y);
+    left: var(--pad-x);
+    font-family: var(--font-body);
+    font-weight: 500;
+    font-size: 48px;
+    letter-spacing: 6px;
+    text-transform: uppercase;
+    color: var(--accent);
+    z-index: 4;
+  }
+
+  .footer {
+    position: absolute;
+    bottom: var(--pad-y);
+    left: var(--pad-x);
+    right: var(--pad-x);
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    z-index: 4;
+  }
+
+  .page-indicator,
+  .wordmark {
+    font-family: var(--font-body);
+    font-weight: 400;
+    font-size: 36px;
+    letter-spacing: 3px;
+    color: var(--text-footer);
+    text-transform: uppercase;
+  }
+
+  .wordmark {
+    font-weight: 500;
+    letter-spacing: 3px;
+  }
+
+  /* Full-bleed AI-generated, duotone-treated background image. src is a
+     base64 data URI substituted by the script — never an external file
+     path, so Playwright never has a file-resolution concern.
+     Top-anchored (object-position: top center) because portrait
+     subjects sit in the upper third of the source image; that keeps
+     the subject in the clear zone above the gradient. This template is
+     now only rendered when a real image exists — when generation
+     fails, the script renders the production cover.html directly
+     instead of this template (see test_portrait_hook.py). */
+  #bg-image {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: top center;
+    z-index: 1;
+  }
+
+  /* Heavy gradient scrim — transparent at top, ramping through 55%/75%,
+     fully opaque by 90% down, so the bottom-anchored text block always
+     reads clean regardless of what the image is doing there. */
+  .gradient-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    background: linear-gradient(
+      to bottom,
+      rgba(26, 22, 18, 0) 0%,
+      rgba(26, 22, 18, 0.7) 55%,
+      rgba(26, 22, 18, 0.97) 75%,
+      rgba(26, 22, 18, 1.0) 90%
+    );
+  }
+
+  /* Content positioning technique reused exactly from base.css/cover.html
+     (content-wrapper fills the canvas, padded top/bottom to define a
+     band; content is the flex:1 + justify-content:center child that
+     sits at that band's optical centre). Only --content-top/
+     --content-bottom differ from cover.html — pushed down to ~60-65%
+     so the block sits inside the gradient-darkened lower zone instead
+     of cover.html's ~46% centre. justify-content: center only —
+     never space-between (DESIGN_LESSONS anti-pattern, breaks with
+     variable-length content). */
+  .content-wrapper {
+    position: absolute;
+    inset: 0;
+    z-index: 3;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: var(--content-top) var(--pad-x) var(--content-bottom);
+  }
+
+  .content {
+    width: 100%;
+    max-width: 1050px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    text-align: center;
+  }
+
+  /* Typography below is pixel-identical to cover.html — same font
+     sizes, weights, colours, and spacing tokens. */
+  .kicker {
+    font-family: var(--font-body);
+    font-weight: 500;
+    font-size: 44px;
+    letter-spacing: 5px;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: var(--gap-md);
+  }
+
+  /* Deviation from "pixel-identical to cover.html", by explicit user
+     decision: cover.html's 180px headline needs its full ~2084px band
+     (reserved by --content-top:200px/--content-bottom:416px) to absorb
+     its own dramatic short-line wrap at the 1050px measure — even 1-2
+     word lines are wide at 180px. This template's band is intentionally
+     shorter (~790px, positioned at ~60-65% down instead of cover.html's
+     ~46% centre), so the headline is sized down to fit that band
+     without cutting off the rule/sub-line below it. Kicker, rule, and
+     sub-line stay pixel-identical to cover.html. */
+  .headline {
+    font-family: var(--font-display);
+    font-weight: 900;
+    font-size: 100px;
+    line-height: 1.05;
+    color: var(--text-primary);
+    letter-spacing: -2px;
+  }
+
+  .headline-line {
+    display: block;
+  }
+
+  .headline .accent {
+    color: var(--accent);
+    font-style: italic;
+    font-weight: 700;
+  }
+
+  .rule {
+    width: 100%;
+    height: 2px;
+    background: var(--accent);
+    opacity: var(--rule-opacity);
+    margin: var(--gap-md) 0;
+  }
+
+  .sub-line {
+    font-family: var(--font-body);
+    font-weight: 400;
+    font-size: 56px;
+    line-height: 1.5;
+    color: var(--text-muted);
+  }
+
+  .swipe {
+    position: absolute;
+    right: var(--pad-x);
+    bottom: 210px;
+    z-index: 3;
+    font-family: var(--font-body);
+    font-weight: 500;
+    font-size: 36px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: #8A8078;
+  }
+</style>
+</head>
+<body class="variant-{{ variant }}">
+<div class="slide">
+
+  <img id="bg-image" src="{{ image_data_uri }}">
+
+  <div class="gradient-overlay"></div>
+
+  <div class="domain-tag">{{ domain_tag }}</div>
+
+  <div class="content-wrapper">
+    <div class="content">
+      <div class="kicker">{{ kicker }}</div>
+      <h1 class="headline"><span class="headline-line">{{ headline_line1 }}</span><span class="headline-line">{{ headline_line2 }}</span></h1>
+      <div class="rule"></div>
+      <p class="sub-line">{{ sub_line }}</p>
+    </div>
+  </div>
+
+  <div class="swipe">Swipe &rarr;</div>
+
+  <footer class="footer">
+    <span class="page-indicator">{{ slide_label }}</span>
+    <span class="wordmark">ANCHOR &amp; DELTA</span>
+  </footer>
+
+</div>
+</body>
+</html>

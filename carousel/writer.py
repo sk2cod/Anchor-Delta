@@ -1,14 +1,24 @@
 """
 CarouselWriter — the single LLM creative call (Blueprint §5.4).
 
-Given StoryContext and SlotPlan, produces all slide text, caption, pinned
+Given StoryContext alone, produces all slide text, caption, pinned
 comment, and hashtag themes in one Sonnet call with structured JSON output.
-Voice consistency requires the model to see the full slide arc in one pass
-(Decision #02) — splitting into per-slide calls produces drift and wastes
-tokens re-establishing context.
+The writer decides the carousel's own narrative shape — slide count, beat
+boundaries, where a quote earns its own slide — rather than filling a
+pre-built slot plan (Decision #67); carousel/planner.py validates that
+shape after the fact instead of dictating it beforehand. Voice consistency
+requires the model to see the full slide arc in one pass (Decision #02) —
+splitting into per-slide calls produces drift and wastes tokens
+re-establishing context.
 
 Uses CAROUSEL_ANTHROPIC_API_KEY, not ANTHROPIC_API_KEY — a separate billing
 account from the Intelligence Engine pipeline (Decision #40).
+
+write_carousel() also generates the cover slide's AI image (Decision #64)
+after the Sonnet call succeeds, via carousel/image_generator.py — a second
+provider (OPENAI_API_KEY, gpt-image-1), kept inside this function so the
+call site in ui/app.py needs no changes. Image-generation failure never
+fails the overall call; the cover slide just renders typography-only.
 """
 
 import hashlib
@@ -22,11 +32,11 @@ from typing import Optional
 import anthropic
 from dotenv import load_dotenv
 
+from carousel import image_generator, planner
 from carousel.models import (
     CarouselSpec,
     GenerationMetadata,
     Slide,
-    SlotPlan,
     SlotRole,
     SourcedQuote,
     StoryContext,
@@ -36,8 +46,8 @@ load_dotenv()
 
 SONNET_MODEL = "claude-sonnet-4-6"
 MAX_TOKENS = 4000
-PROMPT_PATH = Path(__file__).parent / "prompts" / "writer_v1_5.md"
-REGEN_PROMPT_PATH = Path(__file__).parent / "prompts" / "regenerate_v1_2.md"
+PROMPT_PATH = Path(__file__).parent / "prompts" / "writer_v2_0.md"
+REGEN_PROMPT_PATH = Path(__file__).parent / "prompts" / "regenerate_v1_4.md"
 
 # Sonnet pricing per Blueprint-specified formula (per token, not per 1M).
 INPUT_COST_PER_TOKEN = 0.000003
@@ -64,7 +74,7 @@ def _strip_json_fences(text: str) -> str:
     return text.strip()
 
 
-def _build_user_message(context: StoryContext, slot_plan: SlotPlan) -> str:
+def _build_user_message(context: StoryContext) -> str:
     previous_developments = "\n".join(
         f"- {d.headline} — {d.tldr}" for d in context.previous_deltas
     ) or "(none)"
@@ -83,11 +93,21 @@ def _build_user_message(context: StoryContext, slot_plan: SlotPlan) -> str:
         f"- {n.value} — {n.label}: {n.context}" for n in context.dominant_numbers
     ) or "(none)"
 
-    slots = "\n".join(f"- {s.slot_id} ({s.role.value})" for s in slot_plan.slots)
+    # Decision #64 — the Hook Rules' "name the specific subject" guidance
+    # was validated (tests/carousel/test_new_cover.py) against a
+    # primary_entity signal. Rather than a fourth LLM call, this is
+    # derived from data already in context: the first primary-importance
+    # entity from the existing extraction, falling back to the title.
+    primary_entity = next(
+        (e.name for e in context.key_entities if e.importance == "primary"),
+        context.umbrella_title,
+    )
 
     return f"""DOMAIN: {context.domain}
 
 CARD TITLE: {context.umbrella_title}
+
+PRIMARY SUBJECT: {primary_entity}
 
 ANCHOR:
 {context.anchor_text}
@@ -110,9 +130,6 @@ KEY ENTITIES:
 
 KEY NUMBERS:
 {numbers}
-
-SLOT PLAN (write exactly these slides in this order):
-{slots}
 
 CARD AGE: {context.card_age_days} days"""
 
@@ -184,7 +201,7 @@ def _build_spec_from_response(
         cost_usd=cost_usd,
     )
 
-    return CarouselSpec(
+    spec = CarouselSpec(
         script_id=uuid.uuid4(),
         card_id=card_id,
         card_version=card_version,
@@ -196,18 +213,48 @@ def _build_spec_from_response(
         generation_metadata=generation_metadata,
     )
 
+    # Decision #67 — the writer now decides the carousel's own shape;
+    # this is the deterministic Python check that replaces the old
+    # pre-write slot plan, feeding the same one-retry mechanism as the
+    # quote-fabrication guard above.
+    planner.validate_carousel_shape(spec)
+
+    return spec
+
+
+def _attach_cover_image(spec: CarouselSpec, context: StoryContext) -> None:
+    """
+    Decision #64 — generate the cover slide's AI image and attach it to
+    the hook slide, mutating spec in place. Never raises: image
+    generation failure just leaves image_asset=None, and the Cover
+    template degrades to typography-only (carousel/image_generator.py's
+    own contract — see its docstring).
+    """
+    hook_slide = next((s for s in spec.slides if s.role == SlotRole.hook), None)
+    if hook_slide is None:
+        return
+    hook_slide.image_asset = image_generator.generate_cover_image(
+        visual_subject=context.visual_subject,
+        is_person=context.visual_subject_is_person,
+        domain=context.domain,
+    )
+
 
 def write_carousel(
     context: StoryContext,
-    slot_plan: SlotPlan,
     card_id: str,
-    prompt_version: str = "writer-v1.5",
+    prompt_version: str = "writer-v2.0",
 ) -> CarouselSpec:
     """
-    Single Sonnet call producing all slide text, caption,
-    pinned comment, and hashtag themes.
-    Cost: ~$0.025-0.035. Latency: 4-7 seconds.
-    Uses CAROUSEL_ANTHROPIC_API_KEY.
+    Single Sonnet call producing all slide text, caption, pinned comment,
+    and hashtag themes — then one gpt-image-1 call (Decision #64,
+    carousel/image_generator.py) generating the cover slide's AI image.
+    The writer decides the carousel's own shape (Decision #67) — no
+    pre-built slot plan is passed in; carousel/planner.py validates the
+    result afterward.
+    Cost: ~$0.025-0.035 (Sonnet) + ~$0.01-0.02 (gpt-image-1, "high"
+    quality). Latency: 4-7 seconds (Sonnet) + up to ~45s bounded (image).
+    Uses CAROUSEL_ANTHROPIC_API_KEY for text, OPENAI_API_KEY for the image.
     """
     api_key = os.environ.get("CAROUSEL_ANTHROPIC_API_KEY")
     if not api_key:
@@ -218,7 +265,7 @@ def write_carousel(
         )
 
     system_prompt = _load_system_prompt()
-    user_message = _build_user_message(context, slot_plan)
+    user_message = _build_user_message(context)
     card_version = hashlib.md5(
         (context.anchor_text + context.latest_delta.headline).encode("utf-8")
     ).hexdigest()
@@ -238,7 +285,7 @@ def write_carousel(
     response_text = message.content[0].text
 
     try:
-        return _build_spec_from_response(
+        spec = _build_spec_from_response(
             response_text, card_id, card_version, prompt_version, message.usage,
             context.available_quotes,
         )
@@ -261,7 +308,7 @@ def write_carousel(
             raise CarouselWriteError("Sonnet writer retry call failed") from e
 
         try:
-            return _build_spec_from_response(
+            spec = _build_spec_from_response(
                 retry_response.content[0].text,
                 card_id,
                 card_version,
@@ -275,6 +322,9 @@ def write_carousel(
                 f"Second error: {second_error}."
             ) from second_error
 
+    _attach_cover_image(spec, context)
+    return spec
+
 
 def regenerate_slide(
     spec: CarouselSpec,
@@ -282,7 +332,7 @@ def regenerate_slide(
     domain: str,
     card_id: str,
     instruction: Optional[str] = None,
-    prompt_version: str = "regenerate-v1.2",
+    prompt_version: str = "regenerate-v1.4",
 ) -> Slide:
     """
     Model B — targeted slide regenerate.
@@ -327,12 +377,6 @@ def regenerate_slide(
         f"current headline: {target.headline}\n"
         f"current body: {target.body}\n"
     )
-    if target.role == SlotRole.hook:
-        # Decision #54 — cover/hook slide's kicker must survive a targeted
-        # regenerate; pass the existing value through as context so the
-        # model returns it (or a deliberate variant) instead of the field
-        # going unset.
-        user_message += f"current kicker: {target.kicker}\n"
     if target.role == SlotRole.quote:
         # Decision #63 — same pattern as the kicker fix above. This is
         # also the only real, already-validated quote available here:
@@ -387,17 +431,25 @@ def regenerate_slide(
             factsheet_title=data.get("factsheet_title"),
             notes=data.get("notes"),
             manually_edited=False,
+            # Decision #64 — a text-only regenerate must not silently
+            # drop the cover slide's AI-generated image; preserve it
+            # unchanged (Model B has no image-generation capability at
+            # all, by design — regenerating the image is out of scope).
+            image_asset=target.image_asset,
             text_hash=hashlib.md5(
                 (data["headline"] + data.get("body", "")).encode()
             ).hexdigest(),
         )
-        if target.role == SlotRole.hook and not new_slide.kicker:
-            # Decision #54 — a cover/hook slide with kicker=None is a
-            # validation failure, not a silently-accepted result: it
-            # would render with a blank kicker line.
+        if target.role == SlotRole.hook and not new_slide.body:
+            # Decision #64 — replaces the old kicker-None guard (Decision
+            # #54; the Cover template no longer renders a kicker at all).
+            # The sub-heading (body) is now load-bearing narrative
+            # content, not decoration — a blank one is a stronger content
+            # failure than a blank kicker ever was, since it's half of
+            # the "one continuous thought" the headline sets up.
             raise CarouselWriteError(
-                "Regenerated cover/hook slide is missing a kicker "
-                "(cover slides must not have kicker: null)"
+                "Regenerated cover/hook slide is missing a sub-heading "
+                "(cover slides must not have body: empty)"
             )
         if target.role == SlotRole.quote:
             # Decision #63 — same pattern as the kicker-None guard above,

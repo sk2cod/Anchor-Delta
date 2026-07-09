@@ -351,7 +351,6 @@ def render_card(card_data):
                     try:
                         from carousel.loader import load_card
                         from carousel.context_builder import build_context
-                        from carousel.planner import plan_carousel
                         from carousel.writer import write_carousel
                         from carousel.layout_picker import pick_layouts
                         from carousel.renderer import render_carousel
@@ -359,9 +358,8 @@ def render_card(card_data):
 
                         story_card = load_card(card['id'])
                         context = build_context(story_card)
-                        plan = plan_carousel(context)
                         spec = write_carousel(
-                            context, plan, card_id=card['id']
+                            context, card_id=card['id']
                         )
                         enriched = pick_layouts(spec, domain=context.domain)
                         paths = render_carousel(enriched)
