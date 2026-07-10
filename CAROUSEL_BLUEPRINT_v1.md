@@ -3,13 +3,17 @@
 ## Blueprint v1.0
 
 Date frozen: 2026-06-30
-Status: Active. Supersedes none.
+Status: Active — kept current through Decision #73. This document
+describes the system as actually built today; `CAROUSEL_DECISIONS.md`
+holds the historical reasoning behind each change. Where the two
+appear to disagree, the decisions log is the record of *why*, this
+document is the record of *what currently is*.
 
 ---
 
 ## 1. Purpose
 
-Convert finalised Story Cards from the existing Intelligence Engine into publish-ready Instagram carousels. Eight slide PNGs + caption + pinned comment + hashtag list per carousel. Solo-use, human-approved, manual-publish in v1.
+Convert finalised Story Cards from the existing Intelligence Engine into publish-ready Instagram carousels. 5–10 slide PNGs (story-length-driven, not fixed — Decision #67) + caption + pinned comment + hashtag list per carousel. Solo-use, human-approved, manual-publish in v1.
 
 The Story Card produced by the existing pipeline is treated as a frozen contract. This engine reads cards. It does not modify, augment, or write back to them.
 
@@ -17,18 +21,18 @@ The Story Card produced by the existing pipeline is treated as a frozen contract
 
 ## 2. Goals and non-goals
 
-**v1.0 goals:**
+**v1.0 goals (updated to reflect what actually shipped):**
 
 - One-click carousel generation from any Story Card
 - Production-grade typographic visual system across three domains (World / Finance / AI & Tech)
-- Editor-quality content compression: hook taxonomy, domain vocabularies, slot-driven planning
+- Editor-quality content compression: hook rules, domain vocabularies, narrative-driven writing (Decision #67 — revised from the original "slot-driven planning" goal; see §3)
+- AI-generated cover imagery (Decision #64 — pulled forward from the original v1.5 plan, see §14)
 - Solo daily use sustainable: targeted regenerate, inline edit, fast caching
-- Architecture forward-compatible with portraits (v1.5), editorial imagery (v2), Reels companion (v2), Graph API publish (v2)
+- Architecture forward-compatible with a Wikimedia/editorial-photo image source (v1.5/v2), Reels companion (v2), Graph API publish (v2)
 
-**v1.0 non-goals:**
+**v1.0 non-goals (updated — AI image generation moved from here to a goal, Decision #64):**
 
-- AI image generation
-- Photographic backgrounds, portraits, illustrations of any kind
+- Photographic/illustrated content beyond the current AI-generated cover — no per-beat imagery, no Wikimedia source yet (verified: zero implementation exists)
 - Reels, video, or audio output
 - Instagram Graph API publishing
 - Multi-account, multi-user, or team workflows
@@ -36,7 +40,7 @@ The Story Card produced by the existing pipeline is treated as a frozen contract
 - Scheduling or queueing
 - LangGraph, agent frameworks, multi-model abstraction
 
-Each non-goal has a defined re-evaluation point in section 13.
+Each non-goal has a defined re-evaluation point in section 13 [now section 14 — Roadmap].
 
 ---
 
@@ -48,7 +52,22 @@ Five principles. Every component honours all five.
 
 2. **One LLM creative call per generation.** A single Sonnet call produces all slide text, caption draft, and hashtag themes in one pass for voice consistency. Targeted regenerates are additional calls only when needed. Plus one cheap Haiku call upstream for entity/number/quote extraction.
 
-3. **Slot-driven generation.** Python decides which slots exist for a given card. The LLM fills the slots given to it. The model never decides how many slides to write or what structure to use.
+3. **Narrative-driven generation (revised, Decision #67).** Originally
+   this principle was slot-driven: Python decided slide count and role
+   before the writer ran, and the model only filled a pre-built
+   structure — deliberately, to eliminate "wrong shape" failures. Real
+   viewer feedback showed the cost of that guarantee: carousels built
+   from a fixed slot structure read as disconnected facts, not a
+   story, because numbers and quotes got parked on isolated slides
+   instead of landing where they mattered. The guarantee was
+   deliberately relaxed: the writer now reads the full `StoryContext`
+   itself and decides the story's own shape — how many beats it needs,
+   where a quote or number earns its own slide. `CarouselPlanner`'s
+   role inverted to match: instead of deciding structure before
+   writing, it validates the writer's chosen structure *after* writing
+   (`validate_carousel_shape()`) — same "deterministic Python
+   judgment, not LLM self-verification" discipline, just applied to
+   shape after the fact rather than dictating it beforehand.
 
 4. **Cache by content hash. Aggressively.** Three cache layers. Re-render after a text edit is free. Re-render after a template tweak is free for unchanged slides. This is the property that makes daily solo use sustainable.
 
@@ -59,6 +78,9 @@ Five principles. Every component honours all five.
 ## 4. System overview
 
 Seven sequential stages. Each stage takes a typed Pydantic input and returns a typed Pydantic output. There are no dicts passed between stages.
+`CarouselPlanner` moved from stage 3 to stage 5 as of Decision #67 — it
+now validates the writer's output instead of deciding structure before
+the writer runs.
 
 ```
 StoryCard (Supabase)
@@ -70,16 +92,16 @@ StoryCard (Supabase)
 [2] ContextBuilder          Python + 1 Haiku call    ~1.5 s
        │
        ▼
-[3] CarouselPlanner         Python      <10 ms
-       │
+[3] CarouselWriter          1 Sonnet call + 1 gpt-image-1 call    ~5-15 s
+       │  (decides the carousel's own shape — 5-10 slides, not fixed)
        ▼
-[4] CarouselWriter          1 Sonnet call      ~5 s
+[4] CarouselPlanner         Python, post-write validation    <10 ms
        │
        ▼
 [5] LayoutPicker            Python      <10 ms
        │
        ▼
-[6] SlideRenderer           Python (Playwright)      ~2 s for 8 slides cold
+[6] SlideRenderer           Python (Playwright)      ~2 s for a typical 7-slide carousel cold
        │
        ▼
 [7] PostAssembler           Python      <50 ms
@@ -91,7 +113,9 @@ Carousel record (Supabase)
 Streamlit preview → human approval → sync-to-folder
 ```
 
-Total cold-path latency: ~9 seconds for a fresh generation. Warm-path (cache hits): under 1 second.
+Total cold-path latency: ~9-20 seconds for a fresh generation, most of
+the range explained by the cover image call (bounded at 90s timeout,
+typically much faster) and variable slide count. Warm-path (cache hits): under 1 second.
 
 ---
 
@@ -145,86 +169,96 @@ Each component below is specified with: purpose, inputs, outputs, Python or LLM,
 
 ---
 
-### 5.3 CarouselPlanner
+### 5.3 CarouselPlanner (Decision #67 — inverted from pre-write planner to post-write validator)
 
-**Purpose:** Decide slot structure and order for this card. Deterministic Python rules.
+**Purpose:** Validate the shape of the carousel the writer already
+produced. Deterministic Python rules — but applied *after* generation,
+not before. There is no more slot deciding, no keyword matching against
+the transmission, no drop-priority machinery. The writer reads the full
+`StoryContext` and decides count, roles, and where quotes/numbers land
+itself; this stage's only job is confirming the result is structurally
+sound, and rejecting-and-retrying (via the same mechanism as the
+quote-fabrication guard) when it isn't.
 
-**Input:** `StoryContext`
+**Input:** `CarouselSpec` (the writer's already-generated output)
 
-**Output:** `SlotPlan` — ordered list of `Slot` definitions, each with `slot_id`, `role`, `is_optional`.
+**Output:** `None` — raises `PlannerValidationError` (or the more
+specific `WordBudgetExceededError` subclass, Decision #70) on any
+violation; returns silently on success. Called from
+`writer.py`'s `_build_spec_from_response()`, feeding the existing
+one-retry mechanism.
 
-**Slot rules:**
+**Checks performed by `validate_carousel_shape(spec)`:**
 
-Fixed slots (always present): `hook`, `setup`, `payoff`, `cta`.
+| Check | Rule |
+|---|---|
+| First slide | must have `role == hook` |
+| Last slide | must have `role == cta` |
+| Slide count | 5–10 total (`MIN_SLIDES`/`MAX_SLIDES`) — 5 is the user-stated minimum (no padding below it), 10 is Instagram's actual platform limit on carousel media items |
+| Quote slides | at most 2 dedicated `quote`-role slides (`MAX_QUOTE_SLIDES`) |
+| Dominant numbers | **zero** slides may have `dominant_numbers` populated — the retired proof/fact-sheet slot is hard-blocked as code, not just discouraged in the prompt |
+| Word budgets | hook headline ≤8 words, hook sub-heading (body) ≤15 words, beat headline ≤14 words, beat body ≤30 words — each with a 10% tolerance (Decision #69/#70's `_max_words()`, e.g. 30→33) so a small near-miss doesn't burn the one retry the way a genuinely broken response should |
 
-Conditional slots, added in this priority order if their conditions are met:
+**Why the tolerance exists:** a real generation ran a beat body at
+33-34 words against the 30-word target on both the first attempt and
+the retry — a 10-13% miss, not a broken response. Hard-failing on that
+near-miss wasted the retry instead of catching an actual problem.
 
-| Slot | Condition |
-|------|-----------|
-| `event` | `latest_delta` exists (effectively always) |
-| `pivot` | always (it is the reframe slide) |
-| `proof` | `dominant_numbers` is non-empty |
-| `contrast` | transmission contains explicit X-did-A / Y-did-B structure |
-| `mechanism` | domain in {`world`, `ai_tech`} and transmission contains explanatory mechanism content |
-| `concept` | domain in {`finance`, `ai_tech`} and transmission contains framework / structural insight |
+**Why this still matters:** it's the same discipline the original
+slot-deciding design had (avoid "wrong shape" carousels) — just applied
+as a safety net after the writer's creative pass instead of a
+straitjacket before it.
 
-**Hard cap:** 8 total slots (7 content + 1 CTA). If conditional slots would exceed the cap, drop in reverse priority order: `proof` → `concept` → `mechanism` → `contrast`. (`contrast` last because it is load-bearing when present.)
-
-**Python or LLM:** Python. No LLM judgment involved.
-
-**Why this matters:** Eliminates approximately 80% of "carousel is wrong shape" failures. Structure is deterministic; only content is creative.
-
-**Cache:** Keyed by `StoryContext` hash. **Cost:** $0. **Latency:** <10 ms.
+**Cache:** none — it's a pure function, no caching needed. **Cost:** $0. **Latency:** <1 ms.
 
 ---
 
-### 5.4 CarouselWriter — the single LLM creative call
+### 5.4 CarouselWriter — the single LLM creative call, plus one image call
 
-**Purpose:** Given `StoryContext` and `SlotPlan`, produce all slide text, caption, pinned comment, and hashtag themes in one Sonnet call with structured JSON output.
+**Purpose:** Given `StoryContext` alone, produce all slide text, caption, pinned comment, and hashtag themes in one Sonnet call with structured JSON output — the writer decides the carousel's own shape (Decision #67), not a pre-built slot plan. After the Sonnet call succeeds, one `gpt-image-1` call (Decision #64, `carousel/image_generator.py`) generates and duotone-treats the cover slide's background image, inside the same `write_carousel()` function so the call site never needs its own separate step.
 
-**Input:** `StoryContext` + `SlotPlan`
+**Input:** `StoryContext` (no `SlotPlan` — dropped entirely in Decision #67)
 
-**Output:** `CarouselSpec` (full schema in section 6).
+**Output:** `CarouselSpec` (full schema in section 6), with the hook slide's `image_asset` populated on success or left `None` on image-generation failure (never blocks the overall call).
 
-**Prompt architecture (system prompt sections, in order):**
+**Prompt architecture (`writer_v2_0.md`, system prompt sections, in order):**
 
-1. **Role definition.** "Carousel writer for Anchor & Delta, an editorial intelligence brand. Compress finalised Story Cards into punchy, declarative carousels."
+1. **Role definition.** Carousel writer for Anchor & Delta; explicitly told it decides the carousel's own narrative shape rather than filling a pre-built plan.
 
-2. **Brand voice rules.** Direct, no specialist jargon without explanation, active voice, present tense for stakes, **no leading conjunctions** (no "But," "And," "However," "Meanwhile," "Now"), one point per slide, no hedging.
+2. **Brand voice rules.** Active voice, present tense for stakes, no leading conjunctions, no hedging, no narrative dates in body prose (Decision #65 — relative framing like "just"/"this week" instead), non-obvious entities get a one-phrase identifier on first mention and a short anchor on every repeat (Decision #66).
 
-3. **Hook taxonomy.** Four patterns with examples and selection rules. Anti-patterns explicitly listed. See section 9.
+3. **Hook Rules.** Headline ≤8 words/one sentence/no colon + a completing sub-heading ≤15 words, for the image-forward Cover template (Decision #64). Replaces the original 4-pattern taxonomy in section 9 below, which was never what got implemented.
 
 4. **Domain vocabularies.** World runs on consequences/events/casualties; Finance runs on reframes/experts/deadlines/percent-moves; AI&Tech runs on named entities and second-order ironies. See section 9.
 
-5. **Slot-role writing guides.** Each slot has a named job, word budget, and one or two example slides drawn from real Story Cards. See section 10.
+5. **Story Arc & Beat Writing Guide** (Decision #67, replacing the old per-slot writing guides). Subsections: **The essence** (Decision #70) — content and readability are never traded against each other; a beat over its word budget is a signal to split into another beat, never to cut real content; the 10-slide ceiling exists specifically so content is never forced out, even though most carousels should land closer to ~7 (typical attention span). **Finding the arc** — read the transmission's nodes as a non-binding map, not a checklist. **Writing a beat** — headline+body as one continuous thought; numbers and quotes land inline by default; a quote only earns its own beat when strong enough to stand alone, and is never forced when nothing in `AVAILABLE QUOTES` clears that bar (Decision #69's fallback). **Splitting an overloaded beat** (Decision #70) — the concrete mechanic for the essence principle above.
 
 6. **Hard constraints.**
-   - Word limits per slot (see section 10)
+   - Word budgets: hook headline ≤8, hook body ≤15, beat headline ≤14, beat body ≤30 (Decision #68/#69, actually enforced by `CarouselPlanner`, not just stated)
+   - No dedicated numbers/fact-sheet slide — `dominant_numbers` always null
    - For AI&Tech only: every slide should carry at least one named entity
-   - Preserve structural contrasts when the card transmission has X-did-A / Y-did-B structure
-   - Permitted to surface and reuse the card's strongest metaphor when slide-grade
-   - No leading conjunctions
-   - Single point per slide
-   - Narrative thread comes from echo / setup-payoff / escalation / definite articles, never from connector words
+   - No leading conjunctions, no hedging
+   - Narrative thread comes from echo / setup-payoff / escalation / definite articles, never connector words
 
-7. **Output format.** Strict JSON matching `CarouselSpec` schema. Pydantic validates on receipt. Malformed JSON triggers one automatic retry, then surfaces to user.
+7. **Output format.** Strict JSON matching `CarouselSpec` schema, with `slot_id`/`role` writer-generated (`"hook"`, `"beat_1"`, `"beat_2"`, ..., `"cta"`, `"quote"` for a dedicated quote beat) rather than copied from a pre-supplied plan. Pydantic validates on receipt; malformed JSON, a quote-attribution mismatch, or a shape/word-budget violation each trigger one automatic retry with a targeted hint about the specific failure (Decision #69/#70), then either succeed or surface to the user.
 
-8. **Pinned comment instruction.** After writing all slides, identify the single most screenshot-worthy sentence (typically from `payoff` slide) and restate it as `pinned_comment`. Standalone, no hashtags, no @mentions, no questions.
+8. **Pinned comment instruction.** After writing all slides, identify the single most screenshot-worthy sentence (typically the closing beat) and restate it as `pinned_comment`. Standalone, no hashtags, no @mentions, no questions.
 
-**Prompt versioning.** Every `CarouselSpec` records the `prompt_version` it was generated with. Prompt iteration is tracked; rollback is clean; A/B comparison on a fixed card set is possible.
+**Prompt versioning.** Every `CarouselSpec` records the `prompt_version` it was generated with (currently `"writer-v2.0"`). Prompt iteration is tracked; rollback is clean — old prompt files are never overwritten, only superseded (Decision #08).
 
 **Why one call:** Voice consistency requires the model to see the full slide arc in one pass. Splitting into per-slide calls produces drift and wastes tokens re-establishing context.
 
-**Cache:** Keyed by `(card_id, card_version, prompt_version, slot_plan_hash)`.
+**Cache:** Keyed by `(card_id, card_version, prompt_version)` — no `slot_plan_hash` component anymore, since there's no slot plan.
 
-**Cost:** $0.025–0.035 per call. **Latency:** 4–7 seconds.
+**Cost:** ~$0.025–0.035 (Sonnet) + ~$0.01–0.02 (`gpt-image-1`, "high" quality). **Latency:** 4–7 seconds (Sonnet) + up to ~90s bounded (image, `IMAGE_TIMEOUT_SECONDS`).
 
-**Regenerate paths:**
+**Regenerate paths — status as actually built:**
 
-- **Targeted slide regenerate (Model B).** Separate prompt mode. Takes the full `CarouselSpec` plus the `slot_id` to regenerate, plus the freeze-list of `manually_edited` slides. Output is a single `Slide` replacing the targeted one. Cost: approximately $0.008. Latency: 3–5 seconds.
-- **Full script regenerate with instruction (Model A).** Takes original input plus free-text user instruction (e.g. "make the hook sharper", "less corporate"). Outputs a new full `CarouselSpec`. Cost: $0.025–0.035.
-- **Inline text edit (Model C).** No LLM call. User types in Streamlit; `headline`/`body`/`caption` updated directly; `manually_edited=True`; affected slide re-rendered by Python. Cost: $0. Latency: <500 ms.
-- **Caption-only regenerate.** Separate cheap Haiku call. Cost: approximately $0.002. Latency: ~2 seconds.
+- **Targeted slide regenerate (Model B) — implemented.** `regenerate_slide()` in `writer.py`. Takes the full `CarouselSpec` plus the `slot_id` to regenerate, plus an optional free-text instruction; locked (`manually_edited=True`) slides can never be the target. Output is a single `Slide` replacing the targeted one. Cost: approximately $0.008. Latency: 3–5 seconds.
+- **Cover image regenerate — implemented (Decision #64/Decision #71 UI).** Separate from Model B entirely: a `gpt-image-1`-only call (`image_generator.generate_cover_image()`) that swaps the hook slide's image without touching any text. UI exposes an optional keyword override (full override of the auto-derived subject, not a blend) plus a manual `is_person` toggle, at both the initial-generation and regenerate entry points. Cost: ~$0.01–0.02. Latency: up to ~90s bounded.
+- **Inline text edit (Model C) — implemented.** No LLM call. User types in Streamlit; `headline`/`body` updated directly; `manually_edited=True`; affected slide re-rendered by Python. Cost: $0. Latency: <500 ms.
+- **Full script regenerate with instruction (Model A) — not implemented.** The "🪄 Tweak whole carousel" button exists in the UI but is disabled (`ui/carousel_view.py`, tooltip "Full regenerate coming in v1.1"). No corresponding function exists in `writer.py` yet.
+- **Caption-only regenerate — not implemented.** No dedicated function exists; the caption is only editable inline (Model C) today, not independently LLM-regenerated.
 
 ---
 
@@ -235,21 +269,22 @@ Conditional slots, added in this priority order if their conditions are met:
 **Input:** `CarouselSpec`
 
 **Output:** `EnrichedSpec` — same as `CarouselSpec` but each `Slide` is wrapped in a `LayoutChoice`:
-- `template_id` — enum: `statement` | `number` | `quote` | `timeline` | `concept` | `hook` | `cover` | `cta` (+ inert `portrait` slot for v1.5)
+- `template_id` — enum: `statement` | `number` | `quote` | `timeline` | `concept` | `hook` | `cover` | `cta` | `portrait` (last one still inert, no SEAM version has activated it)
 - `text_size_class` — literal: `xl` | `l` | `m` | `s` (based on text length)
 - `accent_colour` — hex from domain palette
 - `theme_variant` — literal: `dark` | `light` (default `dark` in v1)
 
-**Template selection rules (evaluated in order):**
+**Template selection rules — actual current order in `_pick_template()` (Decision #67 added the `beat`-role fallthrough; no other changes since):**
 
-1. **[SEAM v1.5]** If `slide.image_asset` is not None and `slide.role` in {hook, anchor-equivalent} → `portrait` template. In v1.0, `image_asset` is always None, so this rule never fires.
-2. If `slide.quote` is populated → `quote` template
-3. Else if `slide.dominant_number` is populated → `number` template
-4. Else if `slide.role == hook` → `cover` template (Decision #53 — supersedes the interior-styled `hook` template, which is retained but unused)
-5. Else if `slide.role == event` → `timeline` template
-6. Else if `slide.role in {mechanism, concept}` → `concept` template
-7. Else if `slide.role == cta` → `cta` template
-8. Else → `statement` template (the workhorse, expected to cover 50–60% of slides)
+1. If `slide.role == cta` → `cta` template
+2. Else if `slide.role == hook` → `cover` template (Decision #53, rebuilt image-forward per Decision #64 — supersedes the old interior-styled `hook` template, which is retained on disk but unused)
+3. Else if `slide.quote` is populated → `quote` template
+4. Else if `slide.dominant_numbers` (plural — renamed from `dominant_number` in Decision #57) is a non-empty list → `number` template
+5. Else if `slide.role == event` → `timeline` template (dormant for new generations since Decision #67 retired the `event` role — this branch only still matters for re-rendering an old persisted carousel)
+6. Else if `slide.role in {mechanism, concept}` → `concept` template (same dormant-for-new-generations note as above)
+7. Else → `statement` template — this is now the effective default for every `beat`-role slide with no quote, which is most slides in a Decision #67 carousel. A `beat` with no quote falls through every role-specific branch with zero code changes needed when the role was introduced.
+
+`portrait` never fires — no rule in `_pick_template()` currently checks `slide.image_asset`, even though the Cover template's hook slide does have one populated (Decision #64). The active image-forward cover comes entirely from the `hook`→`cover` branch above, not from a `portrait`-specific rule.
 
 **Accent colour:** Domain-based. One accent per domain, applied identically to every slide in a carousel. See section 11.
 
@@ -279,7 +314,7 @@ Conditional slots, added in this priority order if their conditions are met:
 
 **Brand version invalidation:** Any CSS change increments `brand_version`. This invalidates render cache for affected templates. PNGs rebuild lazily on next view.
 
-**Cost:** $0. **Latency:** ~250 ms per slide cold (render at 2×), ~5 ms per slide warm. Cold full carousel: ~2 seconds for 8 slides.
+**Cost:** $0. **Latency:** ~250 ms per slide cold (render at 2×), ~5 ms per slide warm. Cold full carousel: ~1.5–2.5 seconds for a typical 5–10 slide carousel (Decision #67 — count is story-length-driven, no longer fixed at 8).
 
 ---
 
@@ -339,13 +374,25 @@ StoryContext
 │   ├── name: str
 │   ├── type: Literal["person", "company", "agency", "model", "product", "place"]
 │   └── importance: Literal["primary", "secondary"]
-└── dominant_numbers: list[DominantNumber]
-    ├── value: str                        # rendered string e.g. "$2.3T", "1,430"
-    ├── label: str                        # e.g. "dead"
-    └── context: str                      # one-line explanation
+├── dominant_numbers: list[DominantNumber]
+│   ├── value: str                        # rendered string e.g. "$2.3T", "1,430"
+│   ├── label: str                        # e.g. "dead"
+│   └── context: str                      # one-line explanation
+├── visual_subject: str                   # Decision #64 — the cover image's
+│                                          # gpt-image-1 subject, derived by a
+│                                          # separate Haiku call (a "documentary
+│                                          # filmmaker" framing, not a bare
+│                                          # entity label)
+└── visual_subject_is_person: bool        # Decision #64 — picks the portrait
+                                           # vs. object/scene prompt template
 ```
 
-### 6.2 SlotPlan (input to writer)
+### 6.2 SlotPlan (superseded, Decision #67 — no longer an input to the writer)
+
+`SlotPlan`/`Slot` still exist in `carousel/models.py` (deprecated in place, not
+deleted, matching this project's convention elsewhere), but `write_carousel()`
+no longer takes one. The writer receives `StoryContext` alone and decides
+count, roles, and structure itself:
 
 ```
 SlotPlan
@@ -355,7 +402,14 @@ SlotPlan
     └── is_optional: bool
 ```
 
-`SlotRole` enum: `hook | setup | event | pivot | mechanism | concept | proof | contrast | payoff | cta`
+`SlotRole` enum, current: `hook | setup | event | pivot | mechanism | concept
+| proof | quote | contrast | payoff | cta | beat`. The 7 members
+setup/event/pivot/mechanism/concept/proof/contrast are retired from new
+generations as of Decision #67 — kept only so old persisted `CarouselSpec`
+rows in Supabase still deserialize (Pydantic's strict enum validation would
+otherwise fail to load them). New generations collapse all of those into the
+12th member, `beat` — hook, quote, and cta remain in active use exactly as
+before.
 
 ### 6.3 CarouselSpec (output from writer) — the load-bearing model
 
@@ -382,24 +436,43 @@ CarouselSpec
 
 ### 6.4 Slide — the most carefully designed model
 
-Every field below is either active in v1.0 (✅) or a forward-compatibility seam (⏳). Seams are `Optional[X] = None` and ignored by v1 components.
+Every field below is either active (✅) or a forward-compatibility seam
+(⏳). Seams are `Optional[X] = None` and ignored by current components.
+`image_asset` moved from seam to active in Decision #64 — the first field
+in this model to make that jump.
 
 ```
 Slide
-├── slot_id: str                          ✅ matches SlotPlan, e.g. "pivot"
+├── slot_id: str                          ✅ writer-generated (Decision #67),
+│                                          # not copied from a slot plan —
+│                                          # e.g. "hook", "beat_3", "cta"
 ├── role: SlotRole                        ✅
-├── headline: str                         ✅ ≤8 words for hook, ≤14 words otherwise
-├── body: str                             ✅ ≤25 words
+├── headline: str                         ✅ ≤8 words for hook, ≤14 for beat
+├── body: str                             ✅ ≤15 words for hook sub-heading,
+│                                          # ≤30 (±10% tolerance) for beat
 ├── emphasis_word: Optional[str]          ✅ single word for accent treatment
-├── kicker: Optional[str]                 ✅ Cover template only (Decision #53)
-├── quote: Optional[SourcedQuote]         ✅ when slide IS a quote
-├── dominant_number: Optional[Number]     ✅ when slide IS a number
+├── kicker: Optional[str]                 ⏳ deprecated (Decision #64) — the
+│                                          # Cover template no longer renders
+│                                          # one; field kept, always null
+├── quote: Optional[SourcedQuote]         ✅ when slide IS a dedicated quote beat
+├── dominant_numbers: Optional[list[DominantNumber]]  ✅ renamed + pluralised
+│                                          # (Decision #57); always null as of
+│                                          # Decision #67 — no dedicated
+│                                          # numbers slide in new generations,
+│                                          # hard-blocked by CarouselPlanner
+├── factsheet_title: Optional[str]        ⏳ Decision #57, retired alongside
+│                                          # dominant_numbers per Decision #67
 ├── text_hash: str                        ✅ for render cache
 ├── manually_edited: bool = False         ✅ true when user has edited inline
-├── image_asset: Optional[ImageAsset]     ⏳ SEAM v1.5: portraits
-│   ├── source: Literal["wikimedia", "upload", "ai_generated"]
-│   ├── url: str
-│   ├── treatment: Literal["duotone", "high_contrast", "raw"]
+├── image_asset: Optional[ImageAsset]     ✅ ACTIVE (Decision #64) — the Cover
+│   │                                      # template's AI-generated background
+│   ├── source: Literal["wikimedia", "upload", "ai_generated"]  # only
+│   │                                      # "ai_generated" is ever produced
+│   │                                      # today; "wikimedia" remains an
+│   │                                      # unimplemented alternative source
+│   ├── url: str                          # local file path, never inline base64
+│   ├── treatment: Literal["duotone", "high_contrast", "raw"]  # always
+│   │                                      # "duotone" today
 │   └── credit: Optional[str]
 ├── audio_clip_id: Optional[str]          ⏳ SEAM v2: Reels companion
 ├── animation_hint: Optional[str]         ⏳ SEAM v2: motion direction
@@ -476,7 +549,7 @@ Three cache layers, all keyed by content hash. Aggressive by design.
 
 | Layer | Key | Stores | Where |
 |-------|-----|--------|-------|
-| **Writer output cache** | `(card_id, card_version, prompt_version, slot_plan_hash)` | Full `CarouselSpec` | Supabase `carousels` table (status='draft') |
+| **Writer output cache** | `(card_id, card_version, prompt_version)` — no `slot_plan_hash` component since Decision #67 (there's no slot plan anymore) | Full `CarouselSpec` | Supabase `carousels` table (status='draft') |
 | **Render cache** | `hash(template_id + slide content + accent + theme + brand_version)` | PNG file | Local filesystem (object storage later) |
 | **Hashtag rotation log** | Last 10 carousels' hashtag sets | Tag lists | Local file or `hashtag_rotations` table |
 
@@ -492,18 +565,35 @@ Three cache layers, all keyed by content hash. Aggressive by design.
 
 These are the writer prompt's load-bearing patterns. Validated across 5 real Story Cards before lock-in.
 
-### 9.1 Hook taxonomy — 4 patterns
+### 9.1 Hook Rules — headline + completing sub-heading (Decision #64, supersedes the original 4-pattern taxonomy)
 
-The writer selects from these four. Pure questions, accusatory framing on World content, and witty setups as default are explicit anti-patterns.
+The original plan for this section named four selectable patterns
+(Contrast, Negative fact + reveal, Number shock, Insider declaration).
+That taxonomy was never what got implemented — the actual writer prompt
+(`writer_v2_0.md`'s Hook Rules section) uses a different, more specific
+set of rules built for the current image-forward Cover template
+(Decision #64), which renders headline and a completing sub-heading in
+the lower band over an AI-generated background image.
 
-| Pattern | Shape | Use when |
-|---------|-------|----------|
-| **Contrast** | "Action A. Then B." | Card has clear before/after or political-vs-physical dynamic |
-| **Negative fact + reveal** | "X doesn't exist anymore. Y just found out." | Card hinges on something absent or broken |
-| **Number shock** | "[Big number]. [Context that makes it land]." | Card has hook-grade number (1000+, $1B+, dramatic ratio) |
-| **Insider declaration** | "[Counterintuitive fact stated flatly]. [Concrete subject]." | Card's core insight is non-obvious |
+**Headline:** one line, ≤8 words, one sentence — no colon (a colon
+splits the line into two beats exactly like a second sentence would),
+no two-sentence structure, names the specific subject directly, states
+the story's most dramatic/surprising fact without holding it back for
+the sub-heading. One `emphasis_word` — the word carrying the emotional
+hinge.
 
-Hard constraints on every hook: ≤2 lines, ≤14 words total, must match one of the 4 patterns.
+**Sub-heading:** one sentence, ≤15 words, completes the headline rather
+than repeating it — answers "what exactly happened," supplying the
+name/number/date the headline didn't have room for.
+
+Anti-patterns, explicitly banned: pure questions (weaken swipe pull),
+accusatory framing on World/geopolitical content, witty setups as a
+default strategy (unsustainable at daily publishing volume), abstract
+lines that could apply to several different stories.
+
+The prompt includes several GOOD/BAD worked examples the model is told
+to treat as the literal calibration bar, not optional flavour text —
+see `writer_v2_0.md`'s Hook Rules section for the current set.
 
 ### 9.2 Domain vocabularies
 
@@ -519,9 +609,17 @@ These are hints, not hard rules. The writer applies the vocabulary that fits the
 
 For AI & Tech only: every slide should carry at least one named entity (model, person, company, agency, product). Vague references ("a company", "an executive") signal weakness. This rule does not apply to World or Finance, where entity density varies more naturally.
 
-### 9.4 Structural contrast preservation
+### 9.4 Structural contrast (retired as a dedicated role, Decision #67)
 
-When a card's transmission contains explicit X-did-A / Y-did-B structure, the writer must preserve at least one contrast slide. Contrast is structural, not decorative — collapsing it weakens the carousel.
+The original `contrast` slot role — for explicit X-did-A / Y-did-B
+structure — is retired from new generations along with the other 6
+structural roles collapsed into `beat`. There's no dedicated contrast
+slide anymore; when a card's transmission has that shape, it becomes
+one beat (or two, if it earns the room per §5.3's splitting guidance)
+written in prose, same as any other structural pattern the writer
+notices in the transmission. The underlying instinct — don't let a
+genuine before/after collapse into a flat paraphrase — still applies,
+it's just no longer enforced via a named slot.
 
 ### 9.5 Metaphor reuse
 
@@ -535,48 +633,54 @@ Thread between slides comes from echoed language, setup-payoff pairs, escalation
 
 ## 10. Template archetypes
 
-Eight active templates total. Designed by hand in HTML/CSS during template-design week; `Cover` added post-launch (Decision #53).
+Eight template files exist on disk; five are actively produced by new
+generations, three are dormant (kept only for re-rendering old
+persisted carousels, never selected for a fresh `beat`/`hook`/`quote`/
+`cta` carousel).
 
-| Template ID | Role | Used for | Word density |
-|-------------|------|----------|--------------|
-| **Cover** | Cover | Slide 1 only — bottom-anchored, provocative magazine-cover treatment; stops the scroll in the feed grid (Decision #53) | Very low |
-| **Statement** | Workhorse | anchor, pivot, payoff | Medium |
-| **Number** | Drama | Slides where a single figure carries the point | Low (figure dominates) |
-| **Quote** | Authority | Slides where a sourced quote IS the point | Low (quote dominates) |
-| **Timeline** | Event | Date-stamped delta event chapters | Medium |
-| **Concept** | Framework | Mechanism slides (how something works), Concept slides (a framework) | Medium (text-dense) |
-| **Hook** | — | Superseded by Cover for the hook role in v1.0 (Decision #53). Template retained, currently unused. | Very low |
-| **CTA** | Closer | Final slide, fixed copy | Fixed |
+| Template ID | Status | Used for | Word density |
+|-------------|--------|----------|--------------|
+| **Cover** | Active | Slide 1 only — image-forward: full-bleed AI-generated duotone background, punchy headline + completing sub-heading in the lower band (Decision #53, rebuilt Decision #64) | Very low |
+| **Statement** | Active — the workhorse | Every `beat`-role slide with no quote and no populated numbers, which is most slides in a Decision #67 carousel | Medium |
+| **Quote** | Active | A dedicated quote beat — only when a sourced quote is strong enough to carry the whole slide alone (Decision #67's inline-by-default rule) | Low (quote dominates), sized generously per Decision #72 |
+| **CTA** | Active | Final slide, fixed copy | Fixed |
+| **Number** | Dormant | Was the fact-sheet template (Decision #57); retired from new generations by Decision #67 — numbers live inline in beat prose now, hard-blocked by `CarouselPlanner`. Kept for old persisted carousels only. | Low (figure dominates) |
+| **Timeline** | Dormant | Was the `event`-role template; `event` retired by Decision #67, same reasoning as Number above. | Medium |
+| **Concept** | Dormant | Was the `mechanism`/`concept`-role template; both roles retired by Decision #67. Structurally near-identical to Statement (only font-size/weight differ, both covered by `TextSizeClass`). | Medium (text-dense) |
+| **Hook** | Dormant | Superseded by Cover for the hook role since Decision #53. | Very low |
 
-**[SEAM v1.5]** A further template, `Portrait`, will be added in v1.5 for full-bleed treated portraits of named people — distinct from `Cover`, which is active in v1.0. The `Slide.image_asset` field is already in the schema; the LayoutPicker selection rule already exists but never fires in v1.0.
+**Wikimedia/editorial imagery** — `Slide.image_asset.source` supports
+`"wikimedia"` in the schema, but zero fetch code exists anywhere in the
+repo for it (verified directly, not assumed) — it's a real but
+unimplemented alternative to the current `ai_generated`/`gpt-image-1`
+source, not an active feature. `TemplateID.portrait` is similarly inert
+— no selection rule in `layout_picker.py` currently checks
+`image_asset` at all; the active image-forward cover comes entirely
+from the `hook`→`cover` branch, not a portrait-specific rule.
 
-### Slot-to-template default mapping
+### Role-to-template mapping (current)
 
-| Slot role | Default template |
-|-----------|------------------|
-| `hook` | Cover (Decision #53) |
-| `setup` | Statement |
-| `event` | Timeline |
-| `pivot` | Statement |
-| `mechanism` | Concept |
-| `concept` | Concept |
-| `contrast` | Statement |
-| `proof` | Number (or Statement if no dominant number) |
-| `payoff` | Statement |
+| Role | Template |
+|------|----------|
+| `hook` | Cover |
+| `beat` (no quote, no numbers) | Statement — the effective default for nearly every slide |
+| `quote` | Quote |
 | `cta` | CTA |
+| *(retired, dormant-only)* `event` | Timeline |
+| *(retired, dormant-only)* `mechanism`, `concept` | Concept |
+| *(retired, dormant-only)* `proof` | Number |
 
-Quote and Number templates override the default when the slide has a populated `quote` or `dominant_number` field.
+### Word budgets (current, Decision #68/#69/#70)
 
-### Word budgets per slot
+Enforced by `CarouselPlanner.validate_carousel_shape()`, not just stated
+in the prompt — each figure below includes a 10% tolerance before the
+check actually rejects (e.g. 30 → 33).
 
-| Slot | Headline | Body |
+| Role | Headline | Body |
 |------|----------|------|
-| `hook` | ≤8 words | (none — hook is 2 lines headline only) |
-| `setup`, `pivot`, `payoff` | ≤14 words | ≤25 words |
-| `event` (timeline) | ≤10 words + date | ≤30 words |
-| `proof` | the number + label | ≤25 words context |
-| `quote slides` | (attribution above quote) | quote ≤30 words |
-| `mechanism`, `concept` | ≤12 words | ≤45 words (denser than others) |
+| `hook` | ≤8 words, one line, one sentence, no colon | ≤15 words (completing sub-heading) |
+| `beat` | ≤14 words | ≤30 words — a readability constraint on one slide, not a content ceiling on the story; a beat that doesn't fit is a signal to split into another beat (§5.3), never to cut real content |
+| `quote` | attribution name only | quote text itself has no hard word cap, but must stand alone with zero surrounding explanation |
 | `cta` | fixed: "Follow @handle for daily intelligence" | (none) |
 
 ---
@@ -593,12 +697,12 @@ Light theme variant is supported in the schema (`theme_variant`) but not used in
 
 ### 11.2 Domain palettes
 
-Three accents, one per domain. Locked starting values from mockup validation — fine-tune during template-design week:
+Three accents, one per domain, all resolved and locked in `layout_picker.DOMAIN_ACCENTS`:
 
-| Domain | Accent | Starting hex | Rationale |
+| Domain | Accent | Hex | Rationale |
 |--------|--------|--------------|-----------|
 | World | Amber gold | `#C8813A` | Reads like candlelight on warm dark; red on warm brown muddy |
-| Finance | Cool silver-white or muted teal | TBD | Needs contrast against World's warmth; something cooler |
+| Finance | Cool silver | `#A8B8C8` | Resolved from the original "TBD" — needs contrast against World's warmth |
 | AI & Tech | Electric cyan | `#00D9FF` | Strong contrast against warm dark; signals precision |
 
 **Constraints:**
@@ -620,29 +724,40 @@ Self-host both as `.woff2` files in `carousel/fonts/`. Do not load from Google F
 
 Do not use: Space Grotesk, Archivo Black, or any single-font system. The Playfair Display / Inter pairing is load-bearing — it is what makes the slides look distinctive.
 
-### 11.4 Layout chassis (shared across all templates)
+### 11.4 Layout chassis (shared across all templates, `base.css`)
 
-Every slide shares this skeleton — what makes the feed grid read as one body of work:
+Every slide shares this skeleton — what makes the feed grid read as one
+body of work. All sizes below are 2x-canvas CSS values (halve for the
+downscaled 1x final output) — the convention used everywhere in the
+actual codebase, unlike this section's original 1x-first framing.
 
-- Domain tag — top-left, accent colour, Inter 500, 9px at 1× (18px at 2×), letter-spacing 2px, uppercase
-- Main content — vertically centred in remaining space, left-aligned
-- Thin rule line — accent colour at 15–25% opacity, structural divider between headline and body. One per slide maximum.
-- Page indicator — bottom-left, Inter 400, 9px at 1×, muted `#4A4540`
-- Brand wordmark — bottom-right, "ANCHOR & DELTA", Inter 500, 9px at 1×, letter-spacing 1px, muted `#4A4540`
+- Domain tag — top-left, accent colour, Inter 500, 48px (2x), letter-spacing 6px, uppercase
+- Main content — content-wrapper band, top-aligned so leftover space pools at the bottom (reads intentional, not floaty)
+- Thin rule line — accent colour at 40% opacity, structural divider between headline and body. One per slide maximum.
+- Page indicator — bottom-left, Inter 400, 40px (2x), `var(--text-muted)` = `#B0A898` (Decision #73 — was `var(--text-footer)` `#4A4540`, low contrast against the background, nearly invisible)
+- Brand wordmark — bottom-right, "@anchordelta" (Decision #73 — was "ANCHOR & DELTA"), Inter 500, 48px (2x), letter-spacing 3px, `var(--text-muted)`, no uppercase transform (preserves the lowercase handle, matching the Cover slide's own handle exactly)
 
 ### 11.5 Slide-level typography scale
 
-Sizes below are CSS pixel values at 1× canvas (1080px wide). Playwright renders at 2× so actual pixel size is double.
+Sizes vary meaningfully by template — there is no longer one uniform
+scale applied everywhere, unlike the original planning assumption.
+Representative current values (2x-canvas CSS px; halve for 1x final):
 
-| Element | Font | Weight | CSS size | Colour |
-|---------|------|--------|----------|--------|
-| Headline | Playfair Display | 900 | 45–55px | Cream `#E8E0D0` |
-| Accent / emphasis line | Playfair Display | 700 italic | 30–40px | Domain accent |
-| Body text | Inter | 400 | 21–24px | Muted cream `#8A8078` |
-| Date label | Inter | 500 | 18px uppercase | Muted `#4A4540` |
-| Dominant number | Playfair Display | 900 | 60–80px | Domain accent |
-| Number context label | Inter | 400 | 18px | Muted `#5A5248` |
-| Footer (indicator + wordmark) | Inter | 400/500 | 16px | Muted `#4A4540` |
+| Element | Template | Font | Weight | 2x size | Colour |
+|---------|----------|------|--------|---------|--------|
+| Headline | Statement (workhorse) | Playfair Display | 900 | 152px | `var(--text-primary)` `#E8E0D0` |
+| Headline | Cover (hook) | Playfair Display | 900 | 180px | `var(--text-primary)` |
+| Headline | CTA (line 1) | Playfair Display | 900 | 120px | `var(--text-primary)` |
+| Body text | Statement | Inter | 400 | 72px | `var(--text-muted)` `#B0A898` — left-aligned with a modest inset (Decision #68), not centred |
+| Quote text | Quote | Playfair Display italic | 700 | 108px | `var(--text-primary)` (Decision #72 — was 100px, cramped letter-spacing/line-height fixed) |
+| Quote attribution (name) | Quote | Inter | 500 | 48px | `var(--text-primary)` (Decision #72 — was 32px) |
+| Quote role/designation | Quote | Inter | 400 | 38px | `var(--text-muted)` (Decision #72 — was 28px) |
+| Sub-heading | Cover | Inter | 400 | 60px | `var(--text-muted)` |
+| Footer (page indicator + wordmark) | shared, `base.css` | Inter | 400/500 | 40px / 48px | `var(--text-muted)` (Decision #73) |
+
+All hardcoded muted-grey colours across templates were consolidated to
+the single `var(--text-muted)` CSS variable earlier this session — no
+template hand-codes `#8A8078` or `#6B6560` anymore.
 
 ### 11.6 Rendering technical specifications
 
@@ -650,11 +765,12 @@ Sizes below are CSS pixel values at 1× canvas (1080px wide). Playwright renders
 - Render at 2160×2700 (2×), downscale to 1080×1350 for final output
 - Self-hosted fonts loaded via `@font-face` — Playfair Display (700, 900) and Inter (400, 500)
 - Background: warm dark brown `#1A1612`
-- Body text: warm cream `#E8E0D0`
-- Muted text: `#8A8078` for body context, `#4A4540` for footer and labels
+- Primary text: warm cream `#E8E0D0` (`--text-primary`)
+- Muted text: `#B0A898` (`--text-muted`) — used for body context, footer, page indicator, and the wordmark (all consolidated to this one variable; `--text-footer` `#4A4540` still exists in `base.css` but is no longer used by the footer elements its name suggests, after Decision #73)
 - Subtle warm radial gradient overlay on background (amber at ~7% opacity) for depth — not imagery, just warmth
-- Thin rule lines: accent colour at 15–25% opacity — structural, never decorative
+- Thin rule lines: accent colour at 40% opacity — structural, never decorative
 - No drop shadows, no glow effects, no hard gradients on content elements
+- Cover slide only: full-bleed AI-generated duotone background image (Decision #64) plus a separate CSS gradient overlay fading from transparent at the top to fully opaque `#1A1612` by 85% down, guaranteeing the text zone stays legible regardless of image content
 
 **Critical validation step:** After every template iteration during design week, render the PNG at full resolution and open on your actual phone. Not in the browser, not in Streamlit — on the phone, at full screen. Production at 1080×1350 on a modern iPhone is dramatically sharper and more impactful than any desktop preview. This is the only true quality gate.
 
@@ -664,27 +780,39 @@ Sizes below are CSS pixel values at 1× canvas (1080px wide). Playwright renders
 
 A "Generate Carousel" button is added to every card in the existing dashboard.
 
-### 12.1 Preview view
+### 12.1 Preview view (`ui/carousel_view.py`)
 
-- Horizontal scroll of slide thumbnails (~270×340 each)
+- One column per slide (`st.columns(len(slides))`) — bordered container
+  per slide with thumbnail (270px wide), role-abbreviated caption, and
+  per-slide controls
+- Full-width panels below the entire slide row (not inside the narrow
+  per-slide column) for the edit and image-regenerate controls when
+  toggled open — a real bug fixed this session: the image controls were
+  originally built inside the cramped column and were unusable
 - Below: editable caption text box
+- Below: editable pinned comment text box
 - Below: hashtag list (displayed; resampled via button, not directly edited)
-- Below: pinned comment text box
 
 ### 12.2 Per-slide controls
 
-- ✏️ **Edit** — inline text edit, instant re-render via cache
-- 🔄 **Regenerate this** — targeted Sonnet call (Model B)
-- ⛔ **Lock** — toggles `manually_edited` flag, prevents overwriting in cascade regenerates
-- 🖼️ **Add image** — disabled in v1.0 (tooltip: "Portrait support arrives in v1.5") — **[SEAM v1.5]**
+- ✏️ **Edit** — toggles a full-width inline text editor below the row (Model C, no LLM call, instant re-render via cache)
+- 🔄 **Regenerate this** + optional instruction text field — targeted Sonnet call (Model B); ↩️ **Undo** appears after a regenerate to restore the previous slide
+- 🖼️ **Regenerate cover image** — hook slide only. Toggles a full-width panel with an optional keyword field (full override of the auto-derived subject, not a blend) and a manual "portrait / person composition" checkbox, then a single `gpt-image-1` call that swaps only the image — text is never touched. Live and active, not a disabled seam — Decision #64 shipped image generation in v1.0, not v1.5 as originally planned.
+- No lock/freeze button exists as a separate control — `manually_edited` is set automatically by the inline editor (Model C) and read by the regenerate/undo logic to prevent stray overwrites, but there's no dedicated ⛔ UI toggle for it today.
 
 ### 12.3 Script-level controls
 
-- 🔄 Resample hashtags (Python only, no LLM)
-- 🔄 Regenerate caption (Haiku call only)
-- 🪄 Tweak whole carousel (free-text instruction → full Model A regenerate)
-- ✅ **Approve & Sync** — writes bundle to configured local directory
-- 📤 **Publish to Instagram** — disabled in v1.0 (tooltip: "Direct publishing arrives in v2") — **[SEAM v2]**
+- 🔄 **Resample hashtags** — implemented, Python only, no LLM
+- 🪄 **Tweak whole carousel** — UI exists but disabled (tooltip: "Full regenerate coming in v1.1"); no backing function exists in `writer.py` yet
+- ✅ **Approve & Sync** — implemented, writes bundle to the configured directory and marks the carousel `approved`
+- 📤 **Publish to Instagram** — disabled (tooltip: "Direct publishing arrives in v2") — **[SEAM v2]**, unchanged from original plan
+- No separate caption-regenerate control exists — caption is only editable inline today, not independently LLM-regenerated
+
+Cover image generation also has its own entry point at first
+generation, before any carousel exists yet: an optional "🖼️ Cover image
+keywords" expander sits above the 🎠 generate button on every eligible
+card in `ui/app.py`, same override/toggle mechanism as the regenerate
+panel above.
 
 ### 12.4 Sync destination
 
@@ -696,38 +824,61 @@ Configured via the `CAROUSEL_SYNC_DIR` environment variable (`config.py`), not a
 
 | Operation | Cost | Latency |
 |-----------|------|---------|
-| First generation (cold) | $0.030–0.040 | 7–10 s |
-| Targeted slide regenerate | $0.008 | 3–5 s |
-| Caption regenerate (Haiku) | $0.002 | 2 s |
-| Inline edit + re-render | $0 | <500 ms |
-| Full regenerate with instruction | $0.030–0.040 | 7–10 s |
+| First generation (cold) — Haiku context + Sonnet writer + cover image | ~$0.006 (Haiku) + ~$0.025–0.035 (Sonnet) + ~$0.01–0.02 (`gpt-image-1`) ≈ $0.04–0.06 | ~4–7s (Sonnet) + up to ~90s bounded (image) |
+| Targeted slide regenerate (Model B) | ~$0.008 | 3–5 s |
+| Cover image regenerate (image only, no text call) | ~$0.01–0.02 | up to ~90s bounded |
+| Inline edit + re-render (Model C) | $0 | <500 ms |
 | Resample hashtags | $0 | <50 ms |
 | Cached generation (no change) | $0 | <200 ms |
+| Full regenerate with instruction (Model A) | not implemented — UI button disabled | — |
+| Caption regenerate | not implemented — caption only editable inline | — |
 
-**Steady-state target:** 1.0–1.3 LLM call sequences per approved carousel.
+These are the same documented estimates carried in `write_carousel()`'s
+own docstring, not a separate figure — the two should always agree; if
+they ever drift apart, the code comment is the one to trust and this
+table needs updating, not the reverse. The image call is the main new
+cost/latency driver versus the original v1.0 estimate, which predates
+Decision #64 shipping image generation at all.
 
-At 3 carousels/day, that is approximately $0.12–0.15/day, ~$4–5/month. Negligible.
+At 3 carousels/day, that's roughly $0.12–0.18/day depending on how many
+generations need an image regenerate — still negligible, but no longer
+the flat ~$0.037/carousel figure from before image generation existed.
 
 ---
 
 ## 14. Roadmap — v1.0, v1.5, v2
 
-### v1.0 — ships in approximately 3 weeks
+### v1.0 — shipped, ahead of the original plan on one front
 
-Everything in this document. Typography-only carousels with all upgrade seams wired in but inert.
+Everything in this document, plus one thing pulled forward from v1.5:
+**AI-generated cover images shipped in v1.0** (Decision #64), not
+typography-only as originally planned — `gpt-image-1` generates a
+full-bleed background image, duotone-treated to the domain accent, for
+every hook slide. This was a deliberate pull-forward, not a v1.5
+portrait-template activation as described below; the current image
+pipeline is unrelated to Wikimedia and doesn't use the `portrait`
+template at all (see §10's note that `portrait` remains completely
+inert — no selection rule fires for it).
 
-### v1.5 — planned, decided after week 7 review
+### v1.5 — partially reframed given the v1.0 pull-forward above
 
-Two specific additions:
-- **Portrait template** activated. `image_asset` field becomes usable. New asset pipeline (~200 lines of Python) — Wikimedia API fetch + duotone treatment in Pillow. LayoutPicker rule already exists; just turn it on.
-- **Domain prompt tuning** based on real performance data from weeks 3–7.
+- **Portrait template / Wikimedia source** — still not built. Verified
+  directly: zero fetch code exists anywhere in the repo for Wikimedia,
+  and `layout_picker.py`'s `portrait` case never fires. This remains a
+  real future option — a non-AI-generated, non-duotone alternative
+  image source, useful for named real people where `gpt-image-1`'s
+  likeness accuracy is unreliable (see the AskUserQuestion/discussion
+  logged around cover-image keyword overrides) — but it is additive to
+  the current `ai_generated` pipeline, not a replacement for it.
+- **Domain prompt tuning** based on real performance data — not yet
+  started; no post-volume data exists yet to tune against.
 
 ### v2.0 — planned, decided after meaningful post volume (50+ posts)
 
-Three additions:
+Three additions, still all pending — none started:
 - **Reels companion generation.** For each approved carousel, generate a 30-second Reel using: condensed script from CarouselSpec, ElevenLabs voiceover with pronunciation overrides, synced captions, hook-slide ken-burns background. Same approval, dual output.
-- **Editorial imagery slot.** When the card has a specific evocative location/event/object that isn't a person, use the Image-anchor template with treated editorial photography (Wikimedia or licensed source).
-- **Instagram Graph API publishing.** Publisher component replaces sync-to-folder. The `status='approved'` action becomes `Publisher.publish()`.
+- **Editorial imagery slot.** When the card has a specific evocative location/event/object that isn't a person, use a treated editorial photography source (Wikimedia or licensed) — distinct from the current AI-generated cover, which already covers this case today via `gpt-image-1`'s non-person prompt template.
+- **Instagram Graph API publishing.** Publisher component replaces sync-to-folder. The `status='approved'` action becomes `Publisher.publish()`. UI stub already exists (disabled "📤 Publish to Instagram" button) — no backing implementation yet.
 
 ### v3.0 — speculative, defer until v2 data exists
 

@@ -344,7 +344,12 @@ eliminates all reverse lookups.
 The single Sonnet call + single Haiku call architecture held up
 through the entire build. Voice consistency is better than
 multi-call approaches. Targeted regenerate adds calls only when
-the user explicitly requests it. Steady-state cost: ~$0.037/carousel.
+the user explicitly requests it. Steady-state cost grew from an
+original ~$0.037/carousel to ~$0.04-0.06 once AI cover image
+generation shipped in v1.0 (a second provider, one gpt-image-1 call)
+— the one-call discipline for *text* held; a second call for a
+genuinely different capability (imagery) is a different tradeoff,
+not a violation of the principle.
 
 ### justify-content: space-between breaks short content
 space-between on flex containers splits content to extremes with
@@ -357,3 +362,97 @@ If any module imports yaml, pyyaml must be explicitly in
 requirements.txt. It is not included in common Python environments
 by default and will cause silent failures on fresh installs and
 Streamlit Cloud deployments.
+
+### Narrative-driven beats a deterministic slot plan, once voice is trusted
+The original design deliberately made Python decide slide count and
+role before the writer ran, specifically to eliminate "wrong shape"
+carousel failures (Decision #03/#13). That guarantee was the right
+starting point — but real viewer feedback showed its cost: carousels
+built from a fixed slot structure read as disconnected facts, not a
+story, because numbers and quotes got parked on isolated slides
+instead of landing where they mattered. The fix (Decision #67)
+inverted the relationship: the writer decides the story's own shape,
+and deterministic Python validates the result *after* the fact
+instead of dictating it beforehand — same "Python owns judgment, not
+LLM self-verification" philosophy, just moved to the other side of
+the generation call. Lesson: a deterministic guardrail that was right
+for `v1` isn't necessarily right forever — revisit it once you trust
+the model's judgment more than you did at the start, and once you
+have a concrete quality complaint pointing at the guardrail itself.
+
+### State a constraint in the prompt AND enforce it in code — a prompt alone is not enforcement
+Twice this session a rule was written into the prompt and quietly
+never followed: a stated ≤40-word (later ≤30) body budget ran 48-56
+words on a real generation with nothing catching it, and a quote
+attribution guardrail existed in the prompt long before the matching
+code check did. Writing a constraint in prose is necessary but not
+sufficient — if it matters, it needs a matching deterministic Python
+check (`validate_carousel_shape()`, the quote-fabrication guard)
+feeding the retry mechanism. Treat "I told the model not to" as a
+hypothesis, not a guarantee, for anything load-bearing.
+
+### Graceful degradation beats hard failure for optional content
+When the quote-fabrication guard correctly rejected a bad attribution
+twice in a row, the whole carousel generation failed outright — even
+though the quote was optional narrative garnish (Decision #67), not
+required content. The fix wasn't loosening the guard (attribution
+still has to match verbatim); it was making the *retry path* smarter:
+one strict attempt with a targeted correction hint, then drop the one
+bad slide and continue rather than fail the whole generation. Ask,
+for any hard-fail path: is this piece of content actually required,
+or is failing the whole operation punishing the carousel for
+something it could simply do without?
+
+### Build tolerance into LLM-obeyed numeric constraints
+A real generation hit a beat body at 33-34 words against a 30-word
+target on both the first attempt and the retry — a 10-13% miss, not
+a broken response, and the retry actually made it worse (34→35) once.
+LLMs reliably approximate a stated numeric limit; they don't reliably
+hit it exactly. A ~10% tolerance margin before a check actually
+rejects turns near-misses into passes without weakening the check's
+purpose, and stops the one automatic retry from being burned on noise.
+
+### Verify generated/visual output directly before diagnosing — the first hypothesis is often wrong
+Three separate times this session, the actual problem differed from
+the first plausible-sounding explanation, and was only caught by
+looking at real saved output: cover images described as "extremely
+dark" turned out to be a compounding prompt-language + gamma issue,
+not a single obvious cause; a quote slide's attribution was assumed
+to be a clean name and turned out to be a garbled citation string;
+CSS believed to control a footer element's text turned out to be
+dead code once actually rendered and inspected. Read the file, view
+the image, render the slide — before proposing a fix, not after.
+
+### Prompt language compounds — stacking intensifiers pushes further than any one alone
+The image-generation prompt asked for "dark near-black... extreme
+dramatic chiaroscuro... ultra high contrast... dramatic shadows" —
+four or five separate darkness/contrast cues stacked together, with
+nothing telling the model to keep the subject itself legible. The
+model took it literally and produced images too dark to read. The
+fix was subtracting redundant instructions down to one clear mood
+cue plus an explicit legibility requirement, not adding a corrective
+instruction on top of the pile. When an LLM (text or image) is
+overshooting a stylistic direction, check whether the prompt is
+saying the same thing five different ways before concluding the
+model is just being unruly.
+
+### CSS: a child's own explicit rule wins over an ancestor's typography, regardless of source order
+`cta.html` had a local `.cta-footer` rule setting font-size/color on
+the footer element, and it looked like it controlled the wordmark
+text inside it. It didn't — the inner `<span class="wordmark">` matches
+`base.css`'s own `.wordmark` rule directly, and a rule matching an
+element directly always wins over inherited values from an ancestor,
+regardless of which stylesheet loaded first. Confirmed by rendering
+the actual slide after changing only the shared rule, not by reasoning
+about CSS specificity in the abstract — the fix landed in one file
+instead of two because of that verification.
+
+### Prompt injection attempts have appeared inside legitimate tool output this session
+On at least three separate occasions, a tool result (a file read, a
+general review, a `Glob` listing) contained embedded text formatted
+to look like a system instruction, attempting to redirect the acting
+agent into a fabricated role or action. All three were correctly
+identified as illegitimate and ignored, with no actual repo content
+affected. Worth staying alert to on every session, not just noting
+once and forgetting — the pattern recurred across different tool
+types, not just one.

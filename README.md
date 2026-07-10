@@ -13,23 +13,26 @@ Instead of scrolling through headlines, Anchor & Delta builds **living story car
 ## Carousel Engine
 
 Converts finalised Story Cards into publish-ready Instagram
-carousels. Eight slide PNGs + caption + pinned comment +
-hashtag list per carousel.
+carousels. 5–10 slide PNGs (story-length-driven, not a fixed count)
++ caption + pinned comment + hashtag list per carousel, with an
+AI-generated cover image on slide 1.
 
-**Status:** v1.0 — operational, local use only.
+**Status:** Operational, local use only — kept current through
+Decision #73 (see the decisions log).
 
 **How it works:**
-1. Click 🎠 on any World / Finance / AI & Tech card in the dashboard
-2. The engine generates 8 slides via a single Sonnet call (~$0.036)
-3. Review slides, caption, and pinned comment in the preview UI
+1. Click 🎠 on any World / Finance / AI & Tech card in the dashboard (optionally supply cover-image keywords first)
+2. The writer decides the carousel's own shape and generates as many slides as the story needs via a single Sonnet call, then generates the cover image via one gpt-image-1 call
+3. Review slides, caption, and pinned comment in the preview UI — regenerate any single slide, or just the cover image, independently
 4. Click Approve & Sync to export the bundle to outputs/bundles/
 5. Transfer PNGs to phone and post to Instagram manually
 
-**Cost per carousel:** ~$0.037 (1 Sonnet call + 1 Haiku call)
+**Cost per carousel:** ~$0.04–0.06 (1 Haiku call + 1 Sonnet call + 1 gpt-image-1 call)
 
 **Architecture:** 7-stage pipeline —
-CardLoader → ContextBuilder → CarouselPlanner → CarouselWriter →
-LayoutPicker → SlideRenderer → PostAssembler
+CardLoader → ContextBuilder → CarouselWriter (decides shape) →
+CarouselPlanner (validates shape) → LayoutPicker → SlideRenderer →
+PostAssembler
 
 See [CAROUSEL_BLUEPRINT_v1.md](CAROUSEL_BLUEPRINT_v1.md) for the
 architectural spine and [CAROUSEL_DECISIONS.md](CAROUSEL_DECISIONS.md)
@@ -100,29 +103,41 @@ Anchor-Delta/
 
 │   └── runner.py          # Pipeline runner with cost guard
 
-├── carousel/              # Instagram Carousel Engine (scaffolded, empty)
+├── carousel/              # Instagram Carousel Engine — built and operational
 
-│   ├── prompts/           # (scaffolded, empty)
+│   ├── models.py          # Pydantic schemas (StoryContext, CarouselSpec, Slide, ...)
 
-│   ├── templates/         # (scaffolded, empty)
+│   ├── loader.py, context_builder.py, writer.py, planner.py,
 
-│   ├── fonts/             # (scaffolded, empty)
+│   │   layout_picker.py, renderer.py, assembler.py, image_generator.py
 
-│   └── assets/            # (scaffolded, empty)
+│   ├── prompts/           # versioned writer/regenerate prompt files (writer_v2_0.md current)
 
-├── outputs/               # Render output and export bundles (scaffolded, empty)
+│   ├── templates/         # HTML/CSS slide templates (statement, cover, quote, cta, + dormant ones)
 
-│   ├── renders/           # (scaffolded, empty)
+│   ├── fonts/              # self-hosted Playfair Display + Inter .woff2 files
 
-│   └── bundles/           # (scaffolded, empty)
+│   └── assets/             # brand mark, wordmark files
+
+├── outputs/               # Render output and export bundles
+
+│   ├── renders/           # render cache PNGs (gitignored)
+
+│   ├── cover_images/       # AI-generated cover images (gitignored)
+
+│   └── bundles/           # per-carousel export bundles (gitignored)
 
 ├── db/                    # Supabase database layer
 
-├── ui/app.py              # Streamlit dashboard
+├── ui/                    # Streamlit dashboard
+
+│   ├── app.py              # main dashboard + carousel generation entry point
+
+│   └── carousel_view.py    # carousel preview/edit/regenerate/approve UI
 
 ├── tests/                 # Diagnostic scripts
 
-│   └── carousel/          # (scaffolded, empty)
+│   └── carousel/          # carousel-engine test/reference scripts
 
 └── DESIGN_LESSONS.md      # Lessons learned and gotchas
 
