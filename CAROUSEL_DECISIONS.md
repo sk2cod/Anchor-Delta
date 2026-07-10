@@ -1649,6 +1649,59 @@ itself — confirmed by rendering it, not just reasoned about.
 
 ---
 
+## #74 — Real gpt-image-1 cost was $0.25/image, not the documented $0.01-0.02 — now measured, not guessed
+
+**Date:** 2026-07-11
+**Decision:** A full cost-flow audit across the whole project (article
+fetch through carousel generation) surfaced that the cover image's
+cost — documented since Decision #64 as "~$0.01–0.02" — was never
+actually verified against a real price. The user supplied OpenAI's
+current price sheet directly: at this pipeline's exact configuration
+(`gpt-image-1`, quality `"high"`, size `"1024x1536"`), the real price
+is **$0.25 per image** — 12-25x the documented figure. Cross-checked
+against real evidence already in hand from earlier this session (a
+real $2.17 OpenAI charge reconstructed to ~18 images, ≈$0.12/image
+average at the time, before the size/quality tiers were raised) — the
+direction and rough magnitude of the correction was already visible,
+just not pinned to an exact number until now.
+
+`carousel/image_generator.py` gains `IMAGE_PRICING_USD`, a flat
+lookup table keyed by `(quality, size)` matching OpenAI's real tiers
+for `gpt-image-1` — not a per-token rate estimate, since OpenAI bills
+this model per-image at fixed tiers despite the API also returning
+token-usage data. `IMAGE_QUALITY`/`IMAGE_SIZE` constants replace the
+hardcoded `"high"`/`"1024x1536"` literals in the actual API call, so
+the pricing lookup can never silently drift out of sync with what's
+actually requested. `ImageAsset` gains `cost_usd: Optional[float]`.
+`writer.py`'s `_attach_cover_image()` folds the image's real cost into
+`CarouselSpec.generation_metadata.cost_usd`, so a carousel's own
+recorded cost is a real Sonnet+image total, not a Sonnet-only figure
+silently missing ~87-90% of the actual spend.
+
+Every place this project stated a carousel cost figure — this file's
+own change log, `write_carousel()`'s docstring,
+`CAROUSEL_BLUEPRINT_v1.md` §13, `README.md` — corrected from
+~$0.04–0.06 to the real ~$0.28–0.29.
+**Verified:** two ways, since a real generation happened to hit an
+actual OpenAI billing hard limit during testing (a real, useful
+negative-path test): the failure path was confirmed correct
+(`image_asset=None`, `cost_usd` stays Sonnet-only, no crash), and the
+success path was verified in isolation with a mocked successful
+`ImageAsset(cost_usd=0.25)` return, confirming
+`generation_metadata.cost_usd` correctly sums to the expected total
+(0.03 Sonnet + 0.25 image = 0.28).
+**Why:** `image_generator.py` was the only cost-bearing call in the
+entire project (pipeline or carousel side) with zero real cost
+tracking — every other LLM call (Haiku routing, Sonnet extraction/
+composition, the carousel writer) computes `cost_usd` from actual
+`response.usage` token counts. A docstring guess is not the same
+guarantee, and in this case the guess was off by more than an order
+of magnitude — enough to materially misrepresent the project's real
+running cost to anyone reading the documentation.
+**Status:** Active.
+
+---
+
 ## Open questions to revisit
 
 - **Anonymous handle name.** Pending account creation.
@@ -1795,3 +1848,10 @@ itself — confirmed by rendering it, not just reasoned about.
   "ANCHOR & DELTA" → "@anchordelta" (`renderer.py`) to match slide 1's
   handle exactly, including preserving lowercase. `BRAND_VERSION`
   2.0→2.1. Position unchanged on every template.
+- 2026-07-11: Decision #74 added — real gpt-image-1 cost was
+  $0.25/image, not the documented $0.01-0.02 (12-25x understated).
+  New `IMAGE_PRICING_USD` lookup table in `image_generator.py`;
+  `ImageAsset.cost_usd` added; `write_carousel()` folds the real image
+  cost into `generation_metadata.cost_usd`. Every documented carousel
+  cost figure across the project corrected from ~$0.04-0.06 to the
+  real ~$0.28-0.29.

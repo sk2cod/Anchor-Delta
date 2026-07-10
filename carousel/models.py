@@ -214,6 +214,11 @@ class ImageAsset(BaseModel):
     url: str
     treatment: Literal["duotone", "high_contrast", "raw"]
     credit: Optional[str] = None
+    cost_usd: Optional[float] = None  # Decision #74 — real measured cost
+    # from image_generator.IMAGE_PRICING_USD, not the stale flat estimate
+    # that used to live only in a docstring. None for non-"ai_generated"
+    # sources or if the price table has no entry for the (quality, size)
+    # actually used.
 
 
 # ---------------------------------------------------------------------------

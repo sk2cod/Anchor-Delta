@@ -27,7 +27,7 @@ Decision #73 (see the decisions log).
 4. Click Approve & Sync to export the bundle to outputs/bundles/
 5. Transfer PNGs to phone and post to Instagram manually
 
-**Cost per carousel:** ~$0.04–0.06 (1 Haiku call + 1 Sonnet call + 1 gpt-image-1 call)
+**Cost per carousel:** ~$0.28–0.29 (2 Haiku calls + 1 Sonnet call + 1 gpt-image-1 call — the image is ~87-90% of this, $0.25 at real OpenAI pricing, not the ~$0.01-0.02 earlier documentation guessed)
 
 **Architecture:** 7-stage pipeline —
 CardLoader → ContextBuilder → CarouselWriter (decides shape) →

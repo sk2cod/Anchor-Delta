@@ -345,9 +345,10 @@ The single Sonnet call + single Haiku call architecture held up
 through the entire build. Voice consistency is better than
 multi-call approaches. Targeted regenerate adds calls only when
 the user explicitly requests it. Steady-state cost grew from an
-original ~$0.037/carousel to ~$0.04-0.06 once AI cover image
-generation shipped in v1.0 (a second provider, one gpt-image-1 call)
-— the one-call discipline for *text* held; a second call for a
+original ~$0.037/carousel to a real ~$0.28-0.29 once AI cover image
+generation shipped in v1.0 (a second provider, one gpt-image-1 call
+at real pricing — see the cost-estimate lesson further down this
+section) — the one-call discipline for *text* held; a second call for a
 genuinely different capability (imagery) is a different tradeoff,
 not a violation of the principle.
 
@@ -456,3 +457,19 @@ identified as illegitimate and ignored, with no actual repo content
 affected. Worth staying alert to on every session, not just noting
 once and forgetting — the pattern recurred across different tool
 types, not just one.
+
+### An unverified cost estimate in a docstring is not a cost — it's a guess wearing a cost's clothes
+The cover image's cost was documented as "~$0.01-0.02" from the
+moment image generation shipped (Decision #64) through six further
+decisions touching that same file, and never once checked against a
+real bill. A full cost-flow audit finally pinned the real number:
+$0.25/image at the actual quality/size tier in use — 12-25x higher,
+and roughly 87-90% of a carousel's total real cost, not a rounding
+error next to the Sonnet call. Every other LLM call in this project
+computes cost from real `response.usage` token counts; this was the
+one exception, and it was wrong by more than an order of magnitude.
+Lesson: a number written once in a comment and never re-derived from
+an actual API response or a real invoice is a guess, no matter how
+precise it looks or how many other correct-looking decisions cite it
+afterward. If a cost matters enough to document, it matters enough to
+compute from real usage data, not estimate once and trust forever.

@@ -2,41 +2,6 @@
   [
     "#anchordelta",
     "#intelligencebriefing",
-    "#worldpolitics",
-    "#foreignpolicywatch",
-    "#securitystudies"
-  ],
-  [
-    "#anchordelta",
-    "#intelligencebriefing",
-    "#foreignpolicy",
-    "#wareconomics",
-    "#stateconflict"
-  ],
-  [
-    "#anchordelta",
-    "#intelligencebriefing",
-    "#internationalnews",
-    "#sanctionspolicy",
-    "#regimeanalysis"
-  ],
-  [
-    "#anchordelta",
-    "#intelligencebriefing",
-    "#globalaffairs",
-    "#geopoliticalrisk",
-    "#conflictanalysis"
-  ],
-  [
-    "#anchordelta",
-    "#intelligencebriefing",
-    "#aipolicy",
-    "#anthropicai",
-    "#aigovernance"
-  ],
-  [
-    "#anchordelta",
-    "#intelligencebriefing",
     "#tradepolicy",
     "#macrotrends",
     "#centralbanking"
@@ -68,5 +33,40 @@
     "#worldpolitics",
     "#wareconomics",
     "#stateconflict"
+  ],
+  [
+    "#anchordelta",
+    "#intelligencebriefing",
+    "#aipolicy",
+    "#nvidiaai",
+    "#aigovernance"
+  ],
+  [
+    "#anchordelta",
+    "#intelligencebriefing",
+    "#machinelearning",
+    "#anthropicai",
+    "#llmresearch"
+  ],
+  [
+    "#anchordelta",
+    "#intelligencebriefing",
+    "#bigtech",
+    "#aipolicywatch",
+    "#techgeopolitics"
+  ],
+  [
+    "#anchordelta",
+    "#intelligencebriefing",
+    "#geopolitics",
+    "#geopoliticalrisk",
+    "#conflictanalysis"
+  ],
+  [
+    "#anchordelta",
+    "#intelligencebriefing",
+    "#internationalnews",
+    "#foreignpolicywatch",
+    "#securitystudies"
   ]
 ]

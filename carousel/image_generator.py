@@ -50,6 +50,31 @@ DUOTONE_GAMMA = 0.55  # Decision #71 — was 0.70; real generations were
 # output enough for most pixels to reach the lighter half of the
 # shadow->accent gradient below.
 
+IMAGE_QUALITY = "high"
+IMAGE_SIZE = "1024x1536"
+
+# Decision #74 — real gpt-image-1 pricing, user-supplied from OpenAI's
+# current price sheet (2026-07-11). Flat per (quality, size) tier, not
+# linear per-token the way Anthropic's text models are — gpt-image-1's
+# own usage response does return token counts, but OpenAI bills this
+# model per-image at these tiers, so a lookup table is the correct,
+# precise cost source, not a token-rate estimate. Previously this
+# entire cost was an unverified guess (~$0.01-00.02, written once in a
+# docstring in Decision #64 and never checked against a real bill) —
+# off by 12-25x from the real $0.25 rate at the quality/size this
+# pipeline actually uses.
+IMAGE_PRICING_USD = {
+    ("low", "1024x1024"): 0.011,
+    ("low", "1024x1536"): 0.016,
+    ("low", "1536x1024"): 0.016,
+    ("medium", "1024x1024"): 0.042,
+    ("medium", "1024x1536"): 0.063,
+    ("medium", "1536x1024"): 0.063,
+    ("high", "1024x1024"): 0.167,
+    ("high", "1024x1536"): 0.25,
+    ("high", "1536x1024"): 0.25,
+}
+
 # Descriptive colour words / tone words for the DALL-E prompt text —
 # distinct from DOMAIN_ACCENTS (hex, reused from layout_picker rather than
 # duplicated here) since prompt text needs words, not hex codes.
@@ -99,8 +124,14 @@ def generate_cover_image(visual_subject: str, is_person: bool, domain: str) -> O
     """
     Generate a cover image for this story via gpt-image-1, apply the brand
     duotone treatment, and save it to outputs/cover_images/. Returns an
-    ImageAsset(source="ai_generated", url=<file path>, treatment="duotone")
-    on success, or None on any failure — never raises.
+    ImageAsset(source="ai_generated", url=<file path>, treatment="duotone",
+    cost_usd=<real price from IMAGE_PRICING_USD>) on success, or None on
+    any failure — never raises.
+    Cost: $0.25 per image at the current IMAGE_QUALITY/IMAGE_SIZE
+    ("high"/"1024x1536") — see IMAGE_PRICING_USD (Decision #74). Not
+    $0.01-0.02 as earlier versions of this docstring claimed; that
+    figure was an unverified guess, off by 12-25x from OpenAI's real
+    price sheet.
     """
     import base64
 
@@ -140,8 +171,8 @@ def generate_cover_image(visual_subject: str, is_person: bool, domain: str) -> O
         response = client.images.generate(
             model=IMAGE_MODEL,
             prompt=prompt,
-            size="1024x1536",
-            quality="high",
+            size=IMAGE_SIZE,
+            quality=IMAGE_QUALITY,
             n=1,
         )
         b64_source = response.data[0].b64_json
@@ -152,7 +183,22 @@ def generate_cover_image(visual_subject: str, is_person: bool, domain: str) -> O
         output_path = OUTPUT_DIR / f"{uuid.uuid4().hex}.png"
         duotoned.save(output_path, format="PNG")
 
-        return ImageAsset(source="ai_generated", url=str(output_path), treatment="duotone")
+        cost_usd = IMAGE_PRICING_USD.get((IMAGE_QUALITY, IMAGE_SIZE))
+        if cost_usd is None:
+            # Should never happen with the constants above, but a missing
+            # price-table entry must never crash generation over a $0 vs.
+            # unknown-cost bookkeeping gap.
+            logger.warning(
+                "No IMAGE_PRICING_USD entry for (%r, %r) — cost_usd will be None.",
+                IMAGE_QUALITY, IMAGE_SIZE,
+            )
+
+        return ImageAsset(
+            source="ai_generated",
+            url=str(output_path),
+            treatment="duotone",
+            cost_usd=cost_usd,
+        )
 
     except Exception as e:
         logger.warning("Cover image generation failed for domain=%r: %s", domain, e)

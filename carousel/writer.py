@@ -267,6 +267,14 @@ def _attach_cover_image(spec: CarouselSpec, context: StoryContext) -> None:
     generation failure just leaves image_asset=None, and the Cover
     template degrades to typography-only (carousel/image_generator.py's
     own contract — see its docstring).
+
+    Decision #74 — folds the image's real cost_usd (from
+    image_generator.IMAGE_PRICING_USD, not an estimate) into
+    spec.generation_metadata.cost_usd, so the carousel's own recorded
+    cost reflects the Sonnet call AND the image call together — the
+    image is the dominant cost (~$0.25 vs. ~$0.03 for Sonnet), and a
+    generation_metadata.cost_usd that only counted the Sonnet call was
+    understating the real total by roughly 8x.
     """
     hook_slide = next((s for s in spec.slides if s.role == SlotRole.hook), None)
     if hook_slide is None:
@@ -276,6 +284,8 @@ def _attach_cover_image(spec: CarouselSpec, context: StoryContext) -> None:
         is_person=context.visual_subject_is_person,
         domain=context.domain,
     )
+    if hook_slide.image_asset is not None and hook_slide.image_asset.cost_usd is not None:
+        spec.generation_metadata.cost_usd += hook_slide.image_asset.cost_usd
 
 
 def write_carousel(
@@ -290,8 +300,10 @@ def write_carousel(
     The writer decides the carousel's own shape (Decision #67) — no
     pre-built slot plan is passed in; carousel/planner.py validates the
     result afterward.
-    Cost: ~$0.025-0.035 (Sonnet) + ~$0.01-0.02 (gpt-image-1, "high"
-    quality). Latency: 4-7 seconds (Sonnet) + up to ~45s bounded (image).
+    Cost: ~$0.025-0.035 (Sonnet) + $0.25 (gpt-image-1, "high" quality,
+    1024x1536 — real price from image_generator.IMAGE_PRICING_USD,
+    Decision #74; this used to say ~$0.01-0.02, an unverified guess
+    off by 12-25x). Latency: 4-7 seconds (Sonnet) + up to ~90s bounded (image).
     Uses CAROUSEL_ANTHROPIC_API_KEY for text, OPENAI_API_KEY for the image.
     """
     api_key = os.environ.get("CAROUSEL_ANTHROPIC_API_KEY")

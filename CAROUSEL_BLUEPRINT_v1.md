@@ -824,25 +824,32 @@ Configured via the `CAROUSEL_SYNC_DIR` environment variable (`config.py`), not a
 
 | Operation | Cost | Latency |
 |-----------|------|---------|
-| First generation (cold) — Haiku context + Sonnet writer + cover image | ~$0.006 (Haiku) + ~$0.025–0.035 (Sonnet) + ~$0.01–0.02 (`gpt-image-1`) ≈ $0.04–0.06 | ~4–7s (Sonnet) + up to ~90s bounded (image) |
+| First generation (cold) — Haiku context + Sonnet writer + cover image | ~$0.006 (Haiku) + ~$0.025–0.035 (Sonnet) + **$0.25** (`gpt-image-1`, real price — Decision #74) ≈ **$0.28–0.29** | ~4–7s (Sonnet) + up to ~90s bounded (image) |
 | Targeted slide regenerate (Model B) | ~$0.008 | 3–5 s |
-| Cover image regenerate (image only, no text call) | ~$0.01–0.02 | up to ~90s bounded |
+| Cover image regenerate (image only, no text call) | **$0.25** | up to ~90s bounded |
 | Inline edit + re-render (Model C) | $0 | <500 ms |
 | Resample hashtags | $0 | <50 ms |
 | Cached generation (no change) | $0 | <200 ms |
 | Full regenerate with instruction (Model A) | not implemented — UI button disabled | — |
 | Caption regenerate | not implemented — caption only editable inline | — |
 
-These are the same documented estimates carried in `write_carousel()`'s
-own docstring, not a separate figure — the two should always agree; if
-they ever drift apart, the code comment is the one to trust and this
-table needs updating, not the reverse. The image call is the main new
-cost/latency driver versus the original v1.0 estimate, which predates
-Decision #64 shipping image generation at all.
+**Decision #74 correction:** the image cost above was documented as
+~$0.01–0.02 from Decision #64 through Decision #71 — an unverified
+guess, never checked against a real bill. The real price, from
+OpenAI's own price sheet at the `"high"`/`"1024x1536"` tier this
+pipeline actually uses, is **$0.25 per image** — 12-25x higher than
+what was documented. `image_generator.py` now computes this from a
+real `IMAGE_PRICING_USD` lookup table and attaches it to
+`ImageAsset.cost_usd`; `write_carousel()` folds it into
+`CarouselSpec.generation_metadata.cost_usd`, so the carousel's own
+recorded cost is a real total, not a guess plus a real Sonnet figure.
+The image is now clearly the dominant cost of a carousel — roughly
+87-90% of the total, not the Sonnet writer call.
 
-At 3 carousels/day, that's roughly $0.12–0.18/day depending on how many
-generations need an image regenerate — still negligible, but no longer
-the flat ~$0.037/carousel figure from before image generation existed.
+At 3 carousels/day, that's roughly **$0.84–0.87/day, ~$25–26/month** —
+not the ~$0.12–0.18/day this table claimed one commit ago, and nowhere
+near the original ~$0.037/carousel figure from before image generation
+existed at all.
 
 ---
 
