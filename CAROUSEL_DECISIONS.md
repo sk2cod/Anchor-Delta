@@ -1572,6 +1572,83 @@ that overlay is even applied.
 
 ---
 
+## #72 — Quote template attribution and quote text were too small/cramped to read
+
+**Date:** 2026-07-10
+**Decision:** User feedback on a real rendered quote slide: the
+attribution name and role line below the quote were "very small,
+viewer have to get phone closer to read it," and the quote text
+itself read cramped, particularly because it's bold italic. Checked
+the actual numbers before changing anything: the attribution name
+(16px final render size) was smaller than the footer page-indicator
+chrome text (18px) — a person's name was less prominent than page
+furniture. The quote text's `-0.5px` letter-spacing was actively
+tightening already-dense bold italic strokes, and `line-height: 1.2`
+left too little room between wrapped lines.
+
+`carousel/templates/quote.html` changes (all sizes at 2x render
+resolution; final is half):
+- `.attribution` (name): `32px → 48px`, `letter-spacing 2px → 3px`,
+  `margin-bottom 8px → 16px`.
+- `.quote-role` (designation): `28px → 38px`, `letter-spacing
+  1px → 1.5px`.
+- `.quote-text`: `letter-spacing -0.5px → 0px`, `line-height
+  1.2 → 1.35`, `font-size 100px → 108px`.
+- `.content --measure`: `1300px → 1400px` — wider column so lines
+  flex out before wrapping instead of breaking early.
+**Why:** A dedicated quote slide has no competing content fighting
+for space, unlike a beat (word-budget constrained per Decision #68)
+— there was room to let both the quote text and its attribution
+breathe, and nothing about the cramped look was serving a design
+purpose.
+**Verified:** re-rendered a real quote slide (the Vina Nadjibulla /
+TKMS quote used earlier this session) against the new CSS — name and
+role both clearly legible, quote text no longer crowds itself.
+**Status:** Active.
+
+---
+
+## #73 — Footer wordmark and page indicator were nearly invisible from slide 2 onwards
+
+**Date:** 2026-07-10
+**Decision:** User feedback: the "ANCHOR & DELTA" brand mark in the
+bottom-right of every interior slide (and the CTA slide) was nearly
+invisible, and the page counter ("2 / 7") was too small to read
+comfortably. Checked the actual values: both `.page-indicator` and
+`.wordmark` in `base.css` used `color: var(--text-footer)` (`#4A4540`)
+against the `#1A1612` background — very low contrast — while
+`cover.html`'s `.handle` (slide 1's equivalent, top-right) already
+used the much brighter `var(--text-muted)` (`#B0A898`) at 48px.
+
+`carousel/templates/base.css`:
+- `.page-indicator, .wordmark` shared rule: `color` → `var(--text-muted)`,
+  `font-size` `36px → 40px` (2x).
+- `.wordmark`-specific override: `font-size` → `48px` (2x, matching
+  `.handle` exactly), plus `text-transform: none` — the shared rule's
+  `uppercase` would otherwise turn `@anchordelta` into `@ANCHORDELTA`,
+  not matching slide 1's lowercase rendering.
+
+`carousel/renderer.py`: `WORDMARK` constant changed from
+`"ANCHOR & DELTA"` to `"@anchordelta"` — same text slide 1's handle
+already shows. `BRAND_VERSION` `"2.0" → "2.1"` to invalidate the
+render cache for this shared-CSS change.
+
+Position deliberately untouched on every template — still governed by
+`base.css`'s `.footer` flex layout (page-indicator bottom-left,
+wordmark bottom-right), exactly as requested.
+
+One thing verified rather than assumed: `cta.html` has its own local
+`.cta-footer` rule with different (also-dim) font-size/color, but
+since it targets the ancestor `<footer>` element and not the
+`.wordmark` span directly, those properties never actually reached the
+span — `.wordmark`'s own explicit declarations (from `base.css`) won
+for every property that matters. So the single shared-CSS fix
+corrected the CTA slide's footer too, with zero changes to `cta.html`
+itself — confirmed by rendering it, not just reasoned about.
+**Status:** Active.
+
+---
+
 ## Open questions to revisit
 
 - **Anonymous handle name.** Pending account creation.
@@ -1707,3 +1784,14 @@ that overlay is even applied.
   "moody" cue plus an explicit "subject clearly lit" instruction; new
   `DUOTONE_GAMMA = 0.55` (was hardcoded 0.7). Verified against real
   saved images before and after.
+- 2026-07-10: Decision #72 added — quote template attribution/role
+  text and quote text itself were too small/cramped. `quote.html`:
+  attribution 32px→48px, role 28px→38px, quote-text letter-spacing
+  -0.5px→0, line-height 1.2→1.35, size 100px→108px, measure
+  1300px→1400px.
+- 2026-07-10: Decision #73 added — footer wordmark/page indicator
+  nearly invisible from slide 2 onwards (`--text-footer` low contrast).
+  `base.css` bumped both to `--text-muted`; wordmark text changed
+  "ANCHOR & DELTA" → "@anchordelta" (`renderer.py`) to match slide 1's
+  handle exactly, including preserving lowercase. `BRAND_VERSION`
+  2.0→2.1. Position unchanged on every template.

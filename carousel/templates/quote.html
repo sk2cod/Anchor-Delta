@@ -15,7 +15,7 @@
        breathing room. This is the recognised pull-quote treatment.
        To switch back to top-aligned block, change 'center' to 'flex-start'. */
     .content {
-      --measure: 1300px;
+      --measure: 1400px;
       justify-content: center;
     }
 
@@ -53,36 +53,47 @@
       right: var(--pad-x);
     }
 
-    /* Name — prominent, standard cream. */
+    /* Name — prominent, standard cream. Decision #72: bumped from 32px
+       (was reading smaller than the footer page-indicator chrome text)
+       with more letter-spacing and more room below it. */
     .attribution {
       font-family: var(--font-body);
       font-weight: 500;
-      font-size: 32px;
-      letter-spacing: 2px;
+      font-size: 48px;
+      letter-spacing: 3px;
       text-transform: uppercase;
       color: var(--text-primary);
-      margin-bottom: 8px;
+      margin-bottom: 16px;
     }
 
     /* Role — supporting, standard muted. Distinct level from the name
-       above it: smaller, lighter weight, dimmer colour. */
+       above it: smaller, lighter weight, dimmer colour. Decision #72:
+       bumped alongside .attribution, staying proportionally smaller. */
     .quote-role {
       font-family: var(--font-body);
       font-weight: 400;
-      font-size: 28px;
-      letter-spacing: 1px;
+      font-size: 38px;
+      letter-spacing: 1.5px;
       text-transform: uppercase;
       color: var(--text-muted);
     }
 
+    /* Decision #72: was reading cramped — negative letter-spacing was
+       tightening already-dense bold italic strokes, and 1.2 line-height
+       left too little air between wrapped lines. A dedicated quote
+       slide has no competing content fighting for space (unlike a
+       beat, budget-constrained by Decision #68), so there's room to
+       let it breathe: letter-spacing back to neutral, looser
+       line-height, wider measure (see .content above) so lines flex
+       out before wrapping, and a modest size bump. */
     .quote-text {
       font-family: var(--font-display);
       font-weight: 700;
       font-style: italic;
-      font-size: 100px;
-      line-height: 1.2;
+      font-size: 108px;
+      line-height: 1.35;
       color: var(--text-primary);
-      letter-spacing: -0.5px;
+      letter-spacing: 0px;
     }
 
     .quote-text::before {

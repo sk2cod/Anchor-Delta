@@ -2,20 +2,6 @@
   [
     "#anchordelta",
     "#intelligencebriefing",
-    "#technews",
-    "#anthropicai",
-    "#aigovernance"
-  ],
-  [
-    "#anchordelta",
-    "#intelligencebriefing",
-    "#geopolitics",
-    "#geopoliticalrisk",
-    "#conflictanalysis"
-  ],
-  [
-    "#anchordelta",
-    "#intelligencebriefing",
     "#worldpolitics",
     "#foreignpolicywatch",
     "#securitystudies"
@@ -68,5 +54,19 @@
     "#geopolitics",
     "#geopoliticalrisk",
     "#conflictanalysis"
+  ],
+  [
+    "#anchordelta",
+    "#intelligencebriefing",
+    "#businessnews",
+    "#tradewarimpact",
+    "#monetarypolicywatch"
+  ],
+  [
+    "#anchordelta",
+    "#intelligencebriefing",
+    "#worldpolitics",
+    "#wareconomics",
+    "#stateconflict"
   ]
 ]

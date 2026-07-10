@@ -153,19 +153,29 @@ html, body {
   text-align: center;
 }
 
+/* Decision #73: both were --text-footer (#4A4540) against a #1A1612
+   background — barely any contrast, close to invisible from slide 2
+   onwards. Bumped to --text-muted (#B0A898, the same tone cover.html's
+   .handle already uses) plus a size increase. Position is untouched —
+   still controlled by .footer's flex layout (page-indicator left,
+   wordmark right). */
 .page-indicator,
 .wordmark {
   font-family: var(--font-body);
   font-weight: 400;
-  font-size: 36px;
+  font-size: 40px;
   letter-spacing: 3px;
-  color: var(--text-footer);
+  color: var(--text-muted);
   text-transform: uppercase;
 }
 
 .wordmark {
   font-weight: 500;
   letter-spacing: 3px;
+  font-size: 48px; /* matches cover.html's .handle exactly (Decision #73) */
+  text-transform: none; /* .handle has no uppercase transform — without
+    this override the shared uppercase rule above turns "@anchordelta"
+    into "@ANCHORDELTA", which doesn't match slide 1 */
 }
 
 .rule {

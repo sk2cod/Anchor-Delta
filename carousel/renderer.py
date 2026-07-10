@@ -34,8 +34,9 @@ RENDER_HEIGHT = 2700
 FINAL_WIDTH = 1080
 FINAL_HEIGHT = 1350
 
-BRAND_VERSION = "2.0"  # bump when CSS changes, to invalidate the render cache
-WORDMARK = "ANCHOR & DELTA"
+BRAND_VERSION = "2.1"  # bump when CSS changes, to invalidate the render cache
+WORDMARK = "@anchordelta"  # Decision #73 — was "ANCHOR & DELTA"; matches
+# the handle text cover.html's .handle already shows on slide 1
 CTA_HANDLE = "@anchordelta"  # placeholder per Decision #29
 
 DOMAIN_DISPLAY_LABELS = {
