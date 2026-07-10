@@ -1525,6 +1525,53 @@ on implicit prompt inference.
 
 ---
 
+## #71 — Cover images were too dark to read; softened prompt darkness language and strengthened duotone gamma
+
+**Date:** 2026-07-10
+**Decision:** Real generated cover images (checked directly against saved
+files in `outputs/cover_images/`, not just described) were reading as
+near-featureless dark voids — a uranium-ore rock and its treaty
+document, and a mining excavator, were both barely legible even
+zoomed in. Root cause traced through the actual pipeline, not
+guessed: `image_generator.py`'s prompt templates stacked 4-5 redundant
+darkness/contrast descriptors ("dark near-black... extreme dramatic
+chiaroscuro... ultra high contrast... dramatic shadows") with nothing
+telling the model to keep the *subject itself* legible, so
+`gpt-image-1`'s raw output was genuinely low-luminance across most of
+the frame before any post-processing touched it. `apply_duotone()`'s
+`gamma=0.7` brightening pass wasn't strong enough to counteract that —
+most pixels stayed on the dark half of the shadow (`#1A1612`) →
+accent-colour gradient, which is also why the accent colour barely
+showed up in either broken image.
+
+Two changes, both in `carousel/image_generator.py`:
+1. Both prompt templates (person and non-person) rewritten: darkness
+   descriptors collapsed from 4-5 redundant ones down to a single
+   "moody {domain_tone} background" cue, explicit new instruction that
+   the subject itself must be "clearly lit and easy to make out" /
+   "easy to identify," and "extreme/ultra/dramatic" contrast language
+   replaced with "strong but readable contrast."
+2. New `DUOTONE_GAMMA = 0.55` constant (was hardcoded default `0.7` on
+   `apply_duotone()`), passed explicitly at the call site so it's
+   independently tunable from the function's own general-purpose
+   default.
+**Verified:** three real test generations after the fix — the same
+uranium-ore and excavator subjects (for direct before/after
+comparison) plus a new person-portrait test on the finance domain
+(untested before this) — all fully legible, on-brand moody tone
+preserved, and for the first time the domain accent colour (silver-
+blue) is actually visible rather than swallowed by near-black.
+**Why:** User couldn't tell what several generated cover images
+actually depicted. Confirmed by inspecting the actual saved PNGs
+before proposing any fix, not by theorizing from the prompt text
+alone — the CSS gradient overlay in `cover.html` (a separate,
+downstream darkening layer for text legibility) was ruled out as the
+cause, since the raw duotoned images were already unreadable before
+that overlay is even applied.
+**Status:** Active.
+
+---
+
 ## Open questions to revisit
 
 - **Anonymous handle name.** Pending account creation.
@@ -1655,3 +1702,8 @@ on implicit prompt inference.
   ceiling is deliberately above the ~7-slide attention span so content
   is never forced out) and fixes a real contradiction where `## Shape`
   still said to cut a quote/number to hit the word budget.
+- 2026-07-10: Decision #71 added — cover images were too dark to read.
+  Prompt darkness descriptors collapsed from 4-5 redundant ones to one
+  "moody" cue plus an explicit "subject clearly lit" instruction; new
+  `DUOTONE_GAMMA = 0.55` (was hardcoded 0.7). Verified against real
+  saved images before and after.

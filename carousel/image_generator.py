@@ -44,6 +44,11 @@ IMAGE_TIMEOUT_SECONDS = 90.0  # bounded — a hanging call must degrade to the
 # Was 45s; raised after real "Request timed out" failures once size moved
 # 1024x1024 -> 1024x1536 (50% more pixels at quality="high" routinely
 # pushed real generation time past the old bound).
+DUOTONE_GAMMA = 0.55  # Decision #71 — was 0.70; real generations were
+# reading as "extremely dark, hard to tell what it is" (confirmed against
+# actual saved cover images). 0.70 wasn't brightening the raw gpt-image-1
+# output enough for most pixels to reach the lighter half of the
+# shadow->accent gradient below.
 
 # Descriptive colour words / tone words for the DALL-E prompt text —
 # distinct from DOMAIN_ACCENTS (hex, reused from layout_picker rather than
@@ -107,20 +112,20 @@ def generate_cover_image(visual_subject: str, is_person: bool, domain: str) -> O
         prompt = (
             f"Graphic portrait illustration of {visual_subject}, bold ink and "
             f"charcoal style, sharp detailed features, serious authoritative "
-            f"expression, dark near-black solid {domain_tone} background, "
-            f"extreme dramatic chiaroscuro with aggressive {accent_word} "
-            f"highlights catching the edges of the face, high contrast, "
-            f"editorial magazine cover art, no text, no logos, no watermarks, "
-            f"aspect ratio 9:16, vertical orientation"
+            f"expression, clearly lit and easy to make out, moody {domain_tone} "
+            f"background, {accent_word} accent lighting catching the edges of "
+            f"the face, strong but readable contrast, editorial magazine cover "
+            f"art, no text, no logos, no watermarks, aspect ratio 9:16, "
+            f"vertical orientation"
         )
     else:
         prompt = (
             f"Minimalist cinematic editorial shot of {visual_subject}, clean "
-            f"sharp composition, deep near-black {domain_tone} background, "
-            f"stark {accent_word} rim lighting outlining the silhouette and "
-            f"tracing key elements, dramatic chiaroscuro, ultra high contrast, "
-            f"dramatic shadows, editorial magazine cover style, no text, no "
-            f"logos, no watermarks, aspect ratio 9:16, vertical orientation"
+            f"sharp composition, subject clearly lit and easy to identify, "
+            f"moody {domain_tone} background, {accent_word} accent lighting "
+            f"tracing key elements, strong but readable contrast, editorial "
+            f"magazine cover style, no text, no logos, no watermarks, aspect "
+            f"ratio 9:16, vertical orientation"
         )
 
     try:
@@ -141,7 +146,7 @@ def generate_cover_image(visual_subject: str, is_person: bool, domain: str) -> O
         )
         b64_source = response.data[0].b64_json
         raw_image = Image.open(io.BytesIO(base64.b64decode(b64_source)))
-        duotoned = apply_duotone(raw_image, SHADOW_HEX, accent_hex)
+        duotoned = apply_duotone(raw_image, SHADOW_HEX, accent_hex, gamma=DUOTONE_GAMMA)
 
         OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
         output_path = OUTPUT_DIR / f"{uuid.uuid4().hex}.png"
