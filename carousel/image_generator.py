@@ -3,7 +3,10 @@ ImageGenerator — AI-generated, duotone-treated cover images (Decision #64).
 
 Promoted from tests/carousel/test_new_cover.py, where the gpt-image-1 +
 duotone treatment was iteratively validated against real Supabase cards
-across several rounds this session.
+across several rounds this session. Switched from gpt-image-1/high to
+gpt-image-2/medium in Decision #76 after a real side-by-side comparison
+showed comparable-or-better output at 84% lower cost — the duotone
+treatment itself is unchanged by that switch.
 
 Uses OPENAI_API_KEY — a separate provider from the CAROUSEL_ANTHROPIC_API_KEY
 Sonnet/Haiku calls elsewhere in this package. Never raises: any failure
@@ -38,7 +41,13 @@ REPO_ROOT = Path(__file__).parent.parent
 OUTPUT_DIR = REPO_ROOT / "outputs" / "cover_images"
 
 SHADOW_HEX = "#1A1612"  # brand background tone — the duotone shadow colour
-IMAGE_MODEL = "gpt-image-1"
+IMAGE_MODEL = "gpt-image-2"  # Decision #76 — was "gpt-image-1". Switched
+# after a real side-by-side comparison (same prompt/subject, duotone
+# pipeline, rendered through the actual cover.html template): gpt-image-2
+# at medium quality produced a richer, more coherent composition than
+# gpt-image-1 at high quality, at 84% lower cost. Based on one successful
+# sample — see the IMAGE_QUALITY note below on gpt-image-2/high's
+# reliability before trusting this further.
 IMAGE_TIMEOUT_SECONDS = 90.0  # bounded — a hanging call must degrade to the
 # None-fallback within a predictable window, not block the whole request.
 # Was 45s; raised after real "Request timed out" failures once size moved
@@ -48,31 +57,51 @@ DUOTONE_GAMMA = 0.55  # Decision #71 — was 0.70; real generations were
 # reading as "extremely dark, hard to tell what it is" (confirmed against
 # actual saved cover images). 0.70 wasn't brightening the raw gpt-image-1
 # output enough for most pixels to reach the lighter half of the
-# shadow->accent gradient below.
+# shadow->accent gradient below. Untested against gpt-image-2 beyond one
+# sample — revisit if gpt-image-2 output reads differently under this
+# same gamma/LUT treatment.
 
-IMAGE_QUALITY = "high"
+IMAGE_QUALITY = "medium"  # Decision #76 — was "high". gpt-image-2/high
+# failed twice in isolated testing (a transient Cloudflare 520, then a
+# genuine hang) — not necessarily a quality-tier problem, but untrusted
+# right now regardless. Medium succeeded cleanly both times it ran.
 IMAGE_SIZE = "1024x1536"
 
-# Decision #74 — real gpt-image-1 pricing, user-supplied from OpenAI's
-# current price sheet (2026-07-11). Flat per (quality, size) tier, not
-# linear per-token the way Anthropic's text models are — gpt-image-1's
-# own usage response does return token counts, but OpenAI bills this
-# model per-image at these tiers, so a lookup table is the correct,
-# precise cost source, not a token-rate estimate. Previously this
-# entire cost was an unverified guess (~$0.01-00.02, written once in a
-# docstring in Decision #64 and never checked against a real bill) —
-# off by 12-25x from the real $0.25 rate at the quality/size this
-# pipeline actually uses.
+# Real pricing, user-supplied from OpenAI's current price sheet
+# (2026-07-11). Flat per (model, quality, size) tier, not linear
+# per-token the way Anthropic's text models are — this model family's
+# own usage response does return token counts, but OpenAI bills
+# per-image at these tiers, so a lookup table is the correct, precise
+# cost source, not a token-rate estimate. Keyed by model as of Decision
+# #76 (previously just (quality, size), back when gpt-image-1 was the
+# only model ever used — that shape silently can't distinguish models,
+# which would have made a real bug the moment a second model's entries
+# were added the same way). gpt-image-1 entries kept for
+# reference/rollback even though gpt-image-2 is now active — deprecate,
+# don't delete, matching this project's convention elsewhere.
 IMAGE_PRICING_USD = {
-    ("low", "1024x1024"): 0.011,
-    ("low", "1024x1536"): 0.016,
-    ("low", "1536x1024"): 0.016,
-    ("medium", "1024x1024"): 0.042,
-    ("medium", "1024x1536"): 0.063,
-    ("medium", "1536x1024"): 0.063,
-    ("high", "1024x1024"): 0.167,
-    ("high", "1024x1536"): 0.25,
-    ("high", "1536x1024"): 0.25,
+    ("gpt-image-1", "low", "1024x1024"): 0.011,
+    ("gpt-image-1", "low", "1024x1536"): 0.016,
+    ("gpt-image-1", "low", "1536x1024"): 0.016,
+    ("gpt-image-1", "medium", "1024x1024"): 0.042,
+    ("gpt-image-1", "medium", "1024x1536"): 0.063,
+    ("gpt-image-1", "medium", "1536x1024"): 0.063,
+    ("gpt-image-1", "high", "1024x1024"): 0.167,
+    ("gpt-image-1", "high", "1024x1536"): 0.25,
+    ("gpt-image-1", "high", "1536x1024"): 0.25,
+    # Decision #76 — cheaper than gpt-image-1 at every quality/size tier,
+    # not just the medium tier now in use — a genuinely more efficient
+    # model, not just a lower-quality option. Currently active:
+    # ("gpt-image-2", "medium", "1024x1536") = $0.041.
+    ("gpt-image-2", "low", "1024x1024"): 0.006,
+    ("gpt-image-2", "low", "1024x1536"): 0.005,
+    ("gpt-image-2", "low", "1536x1024"): 0.005,
+    ("gpt-image-2", "medium", "1024x1024"): 0.053,
+    ("gpt-image-2", "medium", "1024x1536"): 0.041,
+    ("gpt-image-2", "medium", "1536x1024"): 0.041,
+    ("gpt-image-2", "high", "1024x1024"): 0.211,
+    ("gpt-image-2", "high", "1024x1536"): 0.165,
+    ("gpt-image-2", "high", "1536x1024"): 0.165,
 }
 
 # Descriptive colour words / tone words for the DALL-E prompt text —
@@ -122,16 +151,20 @@ def apply_duotone(pil_image, shadow_hex: str, highlight_hex: str, gamma: float =
 
 def generate_cover_image(visual_subject: str, is_person: bool, domain: str) -> Optional[ImageAsset]:
     """
-    Generate a cover image for this story via gpt-image-1, apply the brand
-    duotone treatment, and save it to outputs/cover_images/. Returns an
+    Generate a cover image for this story via IMAGE_MODEL (gpt-image-2 as
+    of Decision #76, was gpt-image-1), apply the brand duotone treatment,
+    and save it to outputs/cover_images/. Returns an
     ImageAsset(source="ai_generated", url=<file path>, treatment="duotone",
     cost_usd=<real price from IMAGE_PRICING_USD>) on success, or None on
     any failure — never raises.
-    Cost: $0.25 per image at the current IMAGE_QUALITY/IMAGE_SIZE
-    ("high"/"1024x1536") — see IMAGE_PRICING_USD (Decision #74). Not
-    $0.01-0.02 as earlier versions of this docstring claimed; that
-    figure was an unverified guess, off by 12-25x from OpenAI's real
-    price sheet.
+    Cost: $0.041 per image at the current IMAGE_MODEL/IMAGE_QUALITY/
+    IMAGE_SIZE ("gpt-image-2"/"medium"/"1024x1536") — see
+    IMAGE_PRICING_USD (Decision #76). Was $0.25 at gpt-image-1/high
+    (Decision #74) before the switch — an 84% reduction, based on a real
+    side-by-side comparison against gpt-image-1/high (one sample; see
+    Decision #76 for what wasn't yet validated: only the non-person
+    prompt was tested, and gpt-image-2/high failed twice in isolated
+    testing before medium was chosen instead).
     """
     import base64
 
@@ -183,14 +216,14 @@ def generate_cover_image(visual_subject: str, is_person: bool, domain: str) -> O
         output_path = OUTPUT_DIR / f"{uuid.uuid4().hex}.png"
         duotoned.save(output_path, format="PNG")
 
-        cost_usd = IMAGE_PRICING_USD.get((IMAGE_QUALITY, IMAGE_SIZE))
+        cost_usd = IMAGE_PRICING_USD.get((IMAGE_MODEL, IMAGE_QUALITY, IMAGE_SIZE))
         if cost_usd is None:
             # Should never happen with the constants above, but a missing
             # price-table entry must never crash generation over a $0 vs.
             # unknown-cost bookkeeping gap.
             logger.warning(
-                "No IMAGE_PRICING_USD entry for (%r, %r) — cost_usd will be None.",
-                IMAGE_QUALITY, IMAGE_SIZE,
+                "No IMAGE_PRICING_USD entry for (%r, %r, %r) — cost_usd will be None.",
+                IMAGE_MODEL, IMAGE_QUALITY, IMAGE_SIZE,
             )
 
         return ImageAsset(

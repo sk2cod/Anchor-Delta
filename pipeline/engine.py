@@ -35,8 +35,12 @@ RUN_STATS = {
     "start_time": None,
 }
 
-HAIKU_INPUT_COST = 0.80 / 1_000_000
-HAIKU_OUTPUT_COST = 4.00 / 1_000_000
+# Real Anthropic base rates, user-verified against the current price sheet
+# (2026-07-11) — Haiku was previously 0.80/4.00, understated 20% on both
+# sides versus Claude Haiku 4.5's real $1.00/$5.00 base rate. Sonnet was
+# already correct (Claude Sonnet 4.6 base rate, unchanged).
+HAIKU_INPUT_COST = 1.00 / 1_000_000
+HAIKU_OUTPUT_COST = 5.00 / 1_000_000
 SONNET_INPUT_COST = 3.00 / 1_000_000
 SONNET_OUTPUT_COST = 15.00 / 1_000_000
 

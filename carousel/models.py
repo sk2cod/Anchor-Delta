@@ -146,6 +146,15 @@ class StoryContext(BaseModel):
     # generic stand-in for the country/company name.
     visual_subject: str = ""
     visual_subject_is_person: bool = False
+    # Decision #75 — real cost of ContextBuilder's two Haiku calls
+    # (extraction + visual-subject derivation), computed from actual
+    # response.usage token counts. Previously this was an unverified
+    # "~$0.006" docstring estimate with nothing computing it, unlike
+    # every other LLM call in the project. write_carousel() adds this
+    # into CarouselSpec.generation_metadata.cost_usd so a carousel's
+    # recorded cost covers Haiku context + Sonnet + image, not just
+    # the latter two.
+    context_cost_usd: float = 0.0
 
 
 # ---------------------------------------------------------------------------

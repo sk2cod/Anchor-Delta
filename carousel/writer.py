@@ -400,6 +400,11 @@ def write_carousel(
                 f"Second error: {second_error}."
             ) from second_error
 
+    # Decision #75 — fold in ContextBuilder's real Haiku cost (previously
+    # untracked — see context_builder.py's context_cost_usd docstring)
+    # so generation_metadata.cost_usd covers Haiku context + Sonnet +
+    # image, not just the latter two.
+    spec.generation_metadata.cost_usd += context.context_cost_usd
     _attach_cover_image(spec, context)
     return spec
 

@@ -1702,6 +1702,120 @@ running cost to anyone reading the documentation.
 
 ---
 
+## #75 — Registered Haiku rate was 20% low; ContextBuilder's two Haiku calls had zero cost tracking
+
+**Date:** 2026-07-11
+**Decision:** Following directly from Decision #74's cost audit, the
+user supplied Anthropic's current price sheet to cross-check every
+registered LLM rate in the project. Two findings: `pipeline/engine.py`'s
+`HAIKU_INPUT_COST`/`HAIKU_OUTPUT_COST` were `$0.80`/`$4.00` per MTok —
+20% below Claude Haiku 4.5's real base rate of `$1.00`/`$5.00`. Sonnet
+was already correctly registered in both `pipeline/engine.py` and
+`carousel/writer.py` ($3/$15, matching Claude Sonnet 4.6's real rate
+exactly). Separately, `carousel/context_builder.py`'s two Haiku calls
+(entity/quote/number extraction, cover-image visual-subject derivation)
+had no cost tracking at all — the "~$0.006" figure in `build_context()`'s
+docstring was never computed from real usage, the same unverified-cost
+pattern as Decision #74's image gap, just smaller in magnitude.
+
+Two changes:
+1. `pipeline/engine.py`'s `HAIKU_INPUT_COST`/`HAIKU_OUTPUT_COST`
+   corrected to `$1.00`/`$5.00` per MTok.
+2. `carousel/context_builder.py` gains a local copy of the same
+   corrected rate (kept local rather than importing from `pipeline/`,
+   matching `carousel/writer.py`'s existing pattern of its own Sonnet
+   rate constants — `carousel/` and `pipeline/` stay decoupled per
+   Decision #41). `_extract_entities_quotes_numbers()` and
+   `_derive_visual_subject()` now compute real `cost_usd` from actual
+   `response.usage`, summed into new `StoryContext.context_cost_usd`.
+   `write_carousel()` folds this into `CarouselSpec.generation_metadata
+   .cost_usd` alongside the Sonnet and image costs (Decision #74) — a
+   carousel's recorded total cost now covers all three real costs, not
+   two of three.
+**Verified:** real `build_context()` call returned a non-zero,
+plausible `context_cost_usd` (~$0.007, close to but more precise than
+the old $0.006 guess); a full `write_carousel()` run confirmed
+`generation_metadata.cost_usd` included the Haiku context cost even
+while the image call failed on the same real OpenAI billing limit
+encountered during Decision #74's testing (graceful degradation
+correctly left the image contribution at $0, didn't corrupt the
+running total).
+**Not done:** `DESIGN_LESSONS.md`'s "Cost per operation (verified)"
+figures (new card ~$0.056, delta update ~$0.008, noise rejection
+~$0.004) were computed under the old, understated Haiku rate and are
+now directionally low — flagged in place with a correction note
+rather than re-measured, since an accurate re-measurement needs real
+token counts from a fresh pipeline run, not a formula adjustment.
+**Why:** Same reasoning as Decision #74 — a rate or cost registered
+once and never re-verified against a real price sheet is a guess, and
+this project's own "compute cost_usd from real response.usage"
+pattern, used everywhere else, is the actual guarantee that number
+means something.
+**Status:** Active.
+
+---
+
+## #76 — Switched cover image generation from gpt-image-1/high to gpt-image-2/medium — 84% cost reduction
+
+**Date:** 2026-07-11
+**Decision:** Following Decision #74's real cost figure ($0.25/image),
+the user asked to test whether `gpt-image-2` — cheaper than
+`gpt-image-1` at every quality/size tier on OpenAI's price sheet, not
+just a lower-quality option — could replace it. Ran a real side-by-side
+comparison: same prompt, same subject ("a raw uranium ore sample
+resting on an official export treaty document," domain `world`),
+same duotone treatment, rendered through the actual `cover.html`
+template for a true as-it-would-ship comparison, across
+`gpt-image-1`/high (current baseline), `gpt-image-2`/high, and
+`gpt-image-2`/medium.
+
+Results: `gpt-image-2`/medium produced a **richer, more coherent
+composition** than `gpt-image-1`/high in every sample generated (three
+total, across the comparison test and the final production
+verification call) — more scene detail (globe, wax seal, brass scales,
+documents) versus the baseline's sparser single-subject framing — at
+**$0.041 vs $0.25, an 84% reduction**. `gpt-image-2`/high failed twice
+in isolated testing (a transient Cloudflare 520 error, then a genuine
+hang) — not conclusively a quality-tier problem, but untrusted right
+now regardless, so medium was chosen as the one with a clean track
+record, not high.
+
+`carousel/image_generator.py` changes:
+- `IMAGE_MODEL`: `"gpt-image-1"` → `"gpt-image-2"`.
+- `IMAGE_QUALITY`: `"high"` → `"medium"`.
+- `IMAGE_PRICING_USD` restructured from `(quality, size)` keys to
+  `(model, quality, size)` keys — the old 2-tuple shape couldn't
+  distinguish between models at all, which would have been a silent
+  correctness bug the moment a second model's prices were added the
+  way they almost were. Caught and fixed before it shipped, not after.
+  gpt-image-1's entries kept for reference/rollback.
+- Docstrings updated to state the new cost/model plainly, including
+  what wasn't yet validated (see below).
+**Verified:** three real successful generations at `gpt-image-2`/medium
+across two rounds of testing plus one final call through the actual
+production `generate_cover_image()` function (not just the test
+script) — confirmed `ImageAsset.cost_usd` resolves to the correct
+`$0.041` end to end.
+**Not yet validated — real limitations, not resolved by this decision:**
+- Sample size is small (3 successful generations, all the same
+  non-person subject/domain). Real generation has run-to-run variance;
+  this is an encouraging early signal, not a large-scale confirmation.
+- The `is_person=True` portrait prompt path has never been tested
+  against `gpt-image-2` at any quality tier.
+- `gpt-image-2`/high's two failures were never conclusively diagnosed
+  (transient infra error vs. genuine model/tier issue) — if `gpt-image-2`
+  as a whole turns out unreliable rather than just its high tier, that
+  would be a reason to reconsider, not confirmed either way yet.
+**Why:** A real, substantial, verified cost reduction at what real
+testing showed to be comparable-or-better quality is worth taking,
+with the specific gaps above documented honestly rather than papered
+over — matches this project's standing practice of acting on real
+evidence while being explicit about what that evidence does and
+doesn't cover.
+**Status:** Active.
+
+---
+
 ## Open questions to revisit
 
 - **Anonymous handle name.** Pending account creation.
@@ -1855,3 +1969,18 @@ running cost to anyone reading the documentation.
   cost into `generation_metadata.cost_usd`. Every documented carousel
   cost figure across the project corrected from ~$0.04-0.06 to the
   real ~$0.28-0.29.
+- 2026-07-11: Decision #75 added — registered Haiku rate was 20% low
+  ($0.80/$4.00 vs. real $1.00/$5.00 per MTok); Sonnet was already
+  correct. Fixed in `pipeline/engine.py`.
+  `carousel/context_builder.py`'s two Haiku calls had zero cost
+  tracking — now compute real `cost_usd`, summed into new
+  `StoryContext.context_cost_usd`, folded into
+  `generation_metadata.cost_usd` alongside Decision #74's image cost.
+- 2026-07-11: Decision #76 added — switched cover image generation
+  gpt-image-1/high → gpt-image-2/medium after a real side-by-side
+  comparison (rendered through the actual cover.html template): richer
+  compositions, 84% lower cost ($0.041 vs $0.25). `IMAGE_PRICING_USD`
+  restructured to (model, quality, size) keys — the old (quality, size)
+  shape couldn't distinguish models, caught before it became a bug.
+  Small sample size and the untested is_person path documented
+  explicitly, not glossed over.

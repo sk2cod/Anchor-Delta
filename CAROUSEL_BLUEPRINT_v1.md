@@ -824,9 +824,9 @@ Configured via the `CAROUSEL_SYNC_DIR` environment variable (`config.py`), not a
 
 | Operation | Cost | Latency |
 |-----------|------|---------|
-| First generation (cold) — Haiku context + Sonnet writer + cover image | ~$0.006 (Haiku) + ~$0.025–0.035 (Sonnet) + **$0.25** (`gpt-image-1`, real price — Decision #74) ≈ **$0.28–0.29** | ~4–7s (Sonnet) + up to ~90s bounded (image) |
+| First generation (cold) — Haiku context + Sonnet writer + cover image | ~$0.007 (Haiku, real — Decision #75) + ~$0.025–0.035 (Sonnet, real) + $0.041 (`gpt-image-2`/medium, real — Decision #76) ≈ **$0.07–0.08, fully measured** | ~4–7s (Sonnet) + up to ~90s bounded (image) |
 | Targeted slide regenerate (Model B) | ~$0.008 | 3–5 s |
-| Cover image regenerate (image only, no text call) | **$0.25** | up to ~90s bounded |
+| Cover image regenerate (image only, no text call) | **$0.041** | up to ~90s bounded |
 | Inline edit + re-render (Model C) | $0 | <500 ms |
 | Resample hashtags | $0 | <50 ms |
 | Cached generation (no change) | $0 | <200 ms |
@@ -850,6 +850,43 @@ At 3 carousels/day, that's roughly **$0.84–0.87/day, ~$25–26/month** —
 not the ~$0.12–0.18/day this table claimed one commit ago, and nowhere
 near the original ~$0.037/carousel figure from before image generation
 existed at all.
+
+**Decision #75 correction:** the same user-verified audit found
+`pipeline/engine.py`'s registered Haiku rate was also wrong —
+`HAIKU_INPUT_COST`/`HAIKU_OUTPUT_COST` were `$0.80`/`$4.00` per MTok,
+20% below Claude Haiku 4.5's real `$1.00`/`$5.00` base rate (Sonnet's
+registered rate was already correct). Both `pipeline/engine.py` and a
+new local copy in `carousel/context_builder.py` now use the corrected
+rate. `context_builder.py`'s two Haiku calls (extraction +
+visual-subject derivation) previously had no cost tracking at all —
+the "~$0.006" figure above was a docstring guess, same unverified-cost
+pattern as Decision #74's image gap, just smaller. Both calls now
+compute real `cost_usd` from actual token usage
+(`StoryContext.context_cost_usd`), folded into
+`CarouselSpec.generation_metadata.cost_usd` alongside the Sonnet and
+image costs — every dollar in a carousel's recorded total is now
+measured, not estimated. The Intelligence Engine's own per-card cost
+figures (§ measured figures in `DESIGN_LESSONS.md`) were computed
+under the old, understated Haiku rate and are now directionally low
+by roughly the Haiku-weighted share of each call type — not
+re-measured here, since that needs real token counts from a fresh
+run, not a formula correction.
+
+**Decision #76 update:** the $0.25 image figure above lasted one
+decision. A real side-by-side comparison (same prompt/subject, real
+duotone treatment, rendered through the actual `cover.html` template)
+found `gpt-image-2`/medium produced richer, more coherent compositions
+than `gpt-image-1`/high across three real samples, at **$0.041 —an
+84% reduction**. Cover image generation now runs on `gpt-image-2`/
+medium; `gpt-image-1` stays registered in `IMAGE_PRICING_USD` for
+reference/rollback. A carousel's total real cost dropped from
+~$0.28-0.29 to **~$0.07-0.08** — genuinely comparable to the Sonnet
+writer call now, not 8-9x larger than it. At 3 carousels/day, that's
+roughly **$0.21-0.24/day, ~$6-7/month**, not the $25-26/month one
+decision ago. Two things this decision explicitly did not resolve:
+the sample size is still small (3 generations, one subject), and the
+`is_person=True` portrait path has never been tested against
+`gpt-image-2` at all.
 
 ---
 

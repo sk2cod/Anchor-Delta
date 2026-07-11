@@ -262,10 +262,20 @@ A living reference document capturing every issue encountered, root cause, and f
 - Haiku for delta composition — delta updates use Haiku not Sonnet for composition (~25x cheaper)
 - Domain-filtered active cards — when running domain pipeline, only pass that domain's cards to router. Australia with 8 cards: 3,970 tokens vs 5,300 tokens with all 20 cards (25% reduction). AI Tech with 2 cards: 1,800 tokens (66% reduction).
 
-### Cost per operation (verified)
+### Cost per operation (verified — but see the Decision #75 note below)
 - New card: ~$0.056 (1 Haiku routing + 1 Sonnet extraction + 1 Sonnet composition)
 - Delta update: ~$0.008 (1 Haiku routing + 1 Sonnet extraction + 1 Haiku composition)
 - Noise rejection: ~$0.004 (1 Haiku routing only)
+
+**2026-07-11 correction (carousel Decision #75):** these figures were
+computed under `pipeline/engine.py`'s old `HAIKU_INPUT_COST`/
+`HAIKU_OUTPUT_COST` constants ($0.80/$4.00 per MTok), which were 20%
+below Claude Haiku 4.5's real base rate ($1.00/$5.00) — corrected in
+code, but these three figures above were not re-measured against the
+corrected rate (would need a fresh real run's token counts, not a
+formula fix). Treat them as directionally low, most on Noise rejection
+(100% Haiku) and Delta update (2 of 3 calls Haiku), least on New card
+(2 of 3 calls Sonnet, already correctly priced).
 
 ### Daily cost targets
 - Per domain maintenance run (mostly updates): $0.05-0.16

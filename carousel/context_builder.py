@@ -37,6 +37,15 @@ load_dotenv()
 logger = logging.getLogger(__name__)
 
 HAIKU_MODEL = "claude-haiku-4-5-20251001"
+
+# Real Claude Haiku 4.5 base rate, user-verified against Anthropic's price
+# sheet (Decision #75) — kept as local constants rather than importing
+# pipeline/engine.py's copy, matching the existing pattern of
+# carousel/writer.py having its own separate Sonnet rate constants rather
+# than reaching into pipeline/ for them (carousel/ and pipeline/ stay
+# decoupled per Decision #41's boundary discipline).
+HAIKU_INPUT_COST = 1.00 / 1_000_000
+HAIKU_OUTPUT_COST = 5.00 / 1_000_000
 # Bumped 2000 (pre-Decision #56) -> 3000 (Decision #56, dialogue quotes
 # block) -> 10000 (Decision #59, full transmission body for number
 # extraction). A real transmission body alone can run ~6-7k characters
@@ -44,7 +53,8 @@ HAIKU_MODEL = "claude-haiku-4-5-20251001"
 # this cap (see _extraction_input_text), but a cap this tight would
 # starve the base context (title/anchor/headline/tldr) down to nothing
 # whenever a reserved block is large — cheap to avoid, since Haiku input
-# tokens cost $0.80/1M and this call's whole budget is ~$0.005.
+# tokens cost $1.00/1M and this call's whole budget is a few thousandths
+# of a dollar.
 MAX_EXTRACTION_INPUT_CHARS = 10000
 
 EXTRACTION_SYSTEM_PROMPT = """You are a precise information extractor. Extract structured data \
@@ -196,9 +206,19 @@ def _extraction_input_text(
     return base_text[:base_budget] + numbers_block + dialogue_block
 
 
+def _call_cost_usd(usage) -> float:
+    """Decision #75 — real cost from actual usage, not an estimate."""
+    if usage is None:
+        return 0.0
+    return (
+        usage.input_tokens * HAIKU_INPUT_COST
+        + usage.output_tokens * HAIKU_OUTPUT_COST
+    )
+
+
 def _extract_entities_quotes_numbers(
     client: anthropic.Anthropic, text: str
-) -> tuple[list[SourcedQuote], list[Entity], list[DominantNumber]]:
+) -> tuple[list[SourcedQuote], list[Entity], list[DominantNumber], float]:
     """One Haiku call for extraction. Never raises — falls back to empty lists."""
     try:
         message = client.messages.create(
@@ -216,14 +236,16 @@ def _extract_entities_quotes_numbers(
         )
     except Exception as e:
         logger.warning("Haiku extraction call failed: %s", e)
-        return [], [], []
+        return [], [], [], 0.0
 
     usage = getattr(message, "usage", None)
+    cost_usd = _call_cost_usd(usage)
     if usage is not None:
         logger.info(
-            "Haiku extraction usage: input_tokens=%s output_tokens=%s",
+            "Haiku extraction usage: input_tokens=%s output_tokens=%s cost_usd=%s",
             usage.input_tokens,
             usage.output_tokens,
+            round(cost_usd, 6),
         )
 
     try:
@@ -232,21 +254,22 @@ def _extract_entities_quotes_numbers(
         quotes = [SourcedQuote(**q) for q in data.get("quotes", [])]
         entities = [Entity(**e) for e in data.get("entities", [])]
         numbers = [DominantNumber(**n) for n in data.get("numbers", [])]
-        return quotes, entities, numbers
+        return quotes, entities, numbers, cost_usd
     except Exception as e:
         logger.warning("Failed to parse Haiku extraction response: %s", e)
-        return [], [], []
+        return [], [], [], cost_usd
 
 
 def _derive_visual_subject(
     client: anthropic.Anthropic, card: StoryCard, text: str
-) -> tuple[str, bool]:
+) -> tuple[str, bool, float]:
     """
     Decision #64 — one Haiku call deriving a story-specific DALL-E subject
-    for the cover image. Returns (visual_subject, is_person). Never
-    raises — falls back to umbrella_title (treated as not-a-person) on
-    any failure, same fallback pattern as _extract_entities_quotes_numbers.
+    for the cover image. Returns (visual_subject, is_person, cost_usd).
+    Never raises — falls back to umbrella_title (treated as not-a-person)
+    on any failure, same fallback pattern as _extract_entities_quotes_numbers.
     """
+    cost_usd = 0.0
     try:
         message = client.messages.create(
             model=HAIKU_MODEL,
@@ -254,22 +277,26 @@ def _derive_visual_subject(
             system=VISUAL_SUBJECT_SYSTEM_PROMPT,
             messages=[{"role": "user", "content": text}],
         )
+        cost_usd = _call_cost_usd(getattr(message, "usage", None))
         data = json.loads(_strip_json_fences(message.content[0].text))
         visual_subject = (data.get("visual_subject") or "").strip()
         if not visual_subject:
             raise ValueError("empty visual_subject")
-        return visual_subject, bool(data.get("is_person", False))
+        return visual_subject, bool(data.get("is_person", False)), cost_usd
     except Exception as e:
         logger.warning("Visual subject derivation failed, using umbrella_title: %s", e)
-        return card.umbrella_title, False
+        return card.umbrella_title, False, cost_usd
 
 
 def build_context(card: StoryCard) -> StoryContext:
     """
     Transform a StoryCard into a prompt-optimised StoryContext.
     Makes two Haiku calls: entity/number/quote extraction, and cover
-    image visual-subject derivation (Decision #64).
-    Cost: ~$0.006. Latency: ~2-3s.
+    image visual-subject derivation (Decision #64). Real combined cost
+    of both calls is computed from actual token usage and returned as
+    StoryContext.context_cost_usd (Decision #75) — typically a few
+    thousandths of a dollar, not a fixed estimate.
+    Latency: ~2-3s.
     """
     api_key = os.environ.get("CAROUSEL_ANTHROPIC_API_KEY")
     if not api_key:
@@ -308,8 +335,12 @@ def build_context(card: StoryCard) -> StoryContext:
 
     client = anthropic.Anthropic(api_key=api_key)
     extraction_text = _extraction_input_text(card, latest_delta, transmission_summary)
-    quotes, entities, numbers = _extract_entities_quotes_numbers(client, extraction_text)
-    visual_subject, visual_subject_is_person = _derive_visual_subject(client, card, extraction_text)
+    quotes, entities, numbers, extraction_cost = _extract_entities_quotes_numbers(
+        client, extraction_text
+    )
+    visual_subject, visual_subject_is_person, visual_subject_cost = _derive_visual_subject(
+        client, card, extraction_text
+    )
 
     return StoryContext(
         umbrella_title=card.umbrella_title,
@@ -324,4 +355,5 @@ def build_context(card: StoryCard) -> StoryContext:
         dominant_numbers=numbers,
         visual_subject=visual_subject,
         visual_subject_is_person=visual_subject_is_person,
+        context_cost_usd=extraction_cost + visual_subject_cost,
     )

@@ -2,13 +2,6 @@
   [
     "#anchordelta",
     "#intelligencebriefing",
-    "#tradepolicy",
-    "#macrotrends",
-    "#centralbanking"
-  ],
-  [
-    "#anchordelta",
-    "#intelligencebriefing",
     "#internationalnews",
     "#foreignpolicywatch",
     "#securitystudies"
@@ -68,5 +61,12 @@
     "#internationalnews",
     "#foreignpolicywatch",
     "#securitystudies"
+  ],
+  [
+    "#anchordelta",
+    "#intelligencebriefing",
+    "#globalaffairs",
+    "#wareconomics",
+    "#stateconflict"
   ]
 ]
