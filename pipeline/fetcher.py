@@ -1,5 +1,5 @@
 import re
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor, wait
 from urllib.parse import urlparse
 
 import feedparser
@@ -258,10 +258,25 @@ class TavilyFetcher:
             deduped.append(article)
         return deduped
 
-    def enrich_articles_with_body(self, articles: list[dict], max_workers: int = 10) -> list[dict]:
+    def enrich_articles_with_body(
+        self, articles: list[dict], max_workers: int = 10, batch_timeout: float = 60.0
+    ) -> list[dict]:
         """
         Concurrently fetch full article bodies for a list of articles.
         Updates the 'content' field if fetched body is longer than RSS teaser.
+
+        Bounded by batch_timeout, not just each request's own timeout=5s
+        inside fetch_article_body — a stalled DNS/connect can outlive that
+        per-request timeout without ever raising (observed in practice:
+        httpx's timeout doesn't reliably bound blocking name resolution on
+        every network), which would otherwise stall this whole batch, and
+        therefore the whole pipeline run, indefinitely. Articles still in
+        flight when batch_timeout elapses fall back to their original
+        (pre-enrichment) content — the same fallback fetch_article_body
+        itself uses on any per-request failure. Using shutdown(wait=False)
+        rather than the executor-as-context-manager form matters here: the
+        context manager's __exit__ blocks on every submitted thread
+        regardless of batch_timeout, which would silently undo the bound.
         """
         def enrich_one(article):
             enriched = article.copy()
@@ -271,13 +286,18 @@ class TavilyFetcher:
             )
             return enriched
 
-        enriched = []
-        with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            futures = {executor.submit(enrich_one, article): article for article in articles}
-            for future in as_completed(futures):
-                try:
-                    enriched.append(future.result())
-                except Exception:
-                    enriched.append(futures[future])  # Keep original on error
+        executor = ThreadPoolExecutor(max_workers=max_workers)
+        futures = {executor.submit(enrich_one, article): article for article in articles}
+        done, not_done = wait(futures, timeout=batch_timeout)
 
+        enriched = []
+        for future in done:
+            try:
+                enriched.append(future.result())
+            except Exception:
+                enriched.append(futures[future])  # Keep original on error
+        for future in not_done:
+            enriched.append(futures[future])  # Still in flight — keep original
+
+        executor.shutdown(wait=False, cancel_futures=True)
         return enriched
