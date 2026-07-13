@@ -9,6 +9,7 @@ from db import (
     get_card_by_id,
     get_delta_events_for_card,
     log_noise,
+    log_routing_decision,
     update_last_delta_at,
     upsert_transmission,
 )
@@ -45,9 +46,22 @@ def _find_keyword_match(article: dict, active_cards: list) -> str | None:
 
 
 def process_article(article, run_id=None, domain=None):
+    """
+    domain may be None (no restriction), a single domain string, or an
+    iterable of domain strings (e.g. config.CAROUSEL_DOMAINS) — the
+    latter lets the router consider existing cards across all of a
+    grouped run's domains (so e.g. a world-tagged article can still
+    correctly cluster against an existing ai_tech card) while still
+    excluding domains outside the group entirely.
+    """
     try:
         active_cards = get_active_cards()
-        routing_cards = [c for c in active_cards if c["domain"] == domain] if domain else active_cards
+        if not domain:
+            routing_cards = active_cards
+        elif isinstance(domain, (list, tuple, set)):
+            routing_cards = [c for c in active_cards if c["domain"] in domain]
+        else:
+            routing_cards = [c for c in active_cards if c["domain"] == domain]
 
         # Try keyword match first to skip Haiku routing
         keyword_match_id = _find_keyword_match(article, routing_cards)
@@ -60,6 +74,22 @@ def process_article(article, run_id=None, domain=None):
             route_result = _FakeRoute()
         else:
             route_result = route_article(article, routing_cards)
+
+        # Full audit trail of every routing decision (Decision: routing_log) —
+        # noise_log only ever captured *rejections*; the model's own stated
+        # reason for existing_card/new_frame calls was generated on every
+        # call but silently discarded. log_routing_decision() swallows its
+        # own failures internally, so a missing/misconfigured table can
+        # never turn a real created/updated result into a false "error".
+        log_routing_decision(
+            headline=article.get("title", ""),
+            source_url=article.get("url", ""),
+            classification=route_result.classification,
+            reason=route_result.reason,
+            card_id=route_result.card_id if route_result.classification == "existing_card" else None,
+            confidence=route_result.confidence,
+            run_id=run_id,
+        )
 
         if route_result.classification == "noise":
             log_noise(

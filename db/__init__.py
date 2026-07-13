@@ -16,6 +16,11 @@ from db.processed_articles import (
     is_url_seen,
     mark_article_processed,
 )
+from db.routing_log import (
+    get_routing_log_by_run_id,
+    get_routing_log_for_card,
+    log_routing_decision,
+)
 from db.transmissions import get_transmission_for_card, upsert_transmission
 
 __all__ = [
@@ -38,4 +43,7 @@ __all__ = [
     "log_noise",
     "get_noise_log_since",
     "get_noise_log_by_run_id",
+    "log_routing_decision",
+    "get_routing_log_by_run_id",
+    "get_routing_log_for_card",
 ]

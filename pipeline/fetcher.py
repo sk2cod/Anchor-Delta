@@ -206,8 +206,20 @@ class TavilyFetcher:
         return self._dedupe_by_url(articles)
 
     def fetch_rss_articles(self, domain=None) -> list[dict]:
+        """
+        domain may be None (all feeds), a single domain string, or an
+        iterable of domain strings (e.g. config.CAROUSEL_DOMAINS) — the
+        latter lets a grouped run (world+finance+ai_tech) select exactly
+        those feeds without fetching the full catalog and discarding the
+        rest.
+        """
         articles = []
-        feeds = [f for f in RSS_FEEDS if domain is None or f["domain"] == domain]
+        if domain is None:
+            feeds = RSS_FEEDS
+        elif isinstance(domain, (list, tuple, set)):
+            feeds = [f for f in RSS_FEEDS if f["domain"] in domain]
+        else:
+            feeds = [f for f in RSS_FEEDS if f["domain"] == domain]
         for feed_entry in feeds:
             parsed_feed = feedparser.parse(feed_entry["url"])
             source_domain = urlparse(feed_entry["url"]).netloc

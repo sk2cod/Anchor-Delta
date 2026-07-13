@@ -46,6 +46,12 @@ VALID_DOMAINS = [
     "india",
 ]
 
+# The three domains the carousel engine supports (Australia/India have no
+# carousel path) — run together from one button since they're the ones
+# actually used for carousel generation, while Australia/India stay
+# individually-run-only.
+CAROUSEL_DOMAINS = ("world", "finance", "ai_tech")
+
 MAX_ACTIVE_CARDS = 20
 ARCHIVE_AFTER_DAYS = 14
 STALE_CARD_DAYS = 7

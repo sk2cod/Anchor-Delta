@@ -9,7 +9,7 @@ from zoneinfo import ZoneInfo
 
 import streamlit as st
 
-from config import FRESHNESS_HOURS, MAX_ACTIVE_CARDS
+from config import CAROUSEL_DOMAINS, FRESHNESS_HOURS, MAX_ACTIVE_CARDS
 from db.cards import get_active_cards, get_archived_cards, get_card_by_id
 from db.delta_events import get_delta_events_for_card, get_last_run_per_domain
 from db.noise_log import get_noise_log_since
@@ -579,7 +579,7 @@ _DOMAIN_LABELS = {
     "ai_tech": "🤖 AI & Tech",
     "australia": "🌏 Australia",
     "india": "🌐 India",
-    None: "🚀 All Domains",
+    CAROUSEL_DOMAINS: "🚀 Carousel Domains",
 }
 
 if "pending_domain" not in st.session_state:
@@ -608,8 +608,8 @@ with col3:
     if st.button("🤖 AI & Tech", use_container_width=True):
         st.session_state.pending_domain = "ai_tech"
         st.rerun()
-    if st.button("🚀 All Domains", use_container_width=True):
-        st.session_state.pending_domain = None
+    if st.button("🚀 Carousel Domains", use_container_width=True):
+        st.session_state.pending_domain = CAROUSEL_DOMAINS
         st.rerun()
 
 _run_triggered = False
@@ -619,12 +619,12 @@ if "pipeline_running" not in st.session_state:
     st.session_state.pipeline_running = False
 
 if st.session_state.pipeline_running:
-    _running_label = _DOMAIN_LABELS.get(st.session_state.get("_running_domain", "NOT_SET"), "🚀 All Domains")
+    _running_label = _DOMAIN_LABELS.get(st.session_state.get("_running_domain", "NOT_SET"), "🚀 Carousel Domains")
     st.info(f"⚙️ Running {_running_label} pipeline...")
 
 elif st.session_state.pending_domain != "NOT_SET":
     _pending = st.session_state.pending_domain
-    _label = _DOMAIN_LABELS.get(_pending, "🚀 All Domains")
+    _label = _DOMAIN_LABELS.get(_pending, "🚀 Carousel Domains")
     col_msg, col_confirm, col_cancel = st.columns([4, 1, 1])
     with col_msg:
         st.info(f"▶ Run {_label} pipeline?")
