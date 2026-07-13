@@ -359,15 +359,34 @@ def write_carousel(
             # get LONGER, not shorter (34 -> 35 words on a real generation).
             # Trimming words in place isn't reliably how the model recovers
             # from this; splitting the overloaded beat into two is.
-            retry_note += (
-                "\n\nDo not try to trim this beat further — that has "
-                "already failed once. Split it into two beats instead: "
-                "keep each piece of content (the quote, the statistic, the "
-                "second idea — whatever is making this beat too long) but "
-                "give it its own beat with its own headline, rather than "
-                "compressing everything into one. There is slide-count "
-                "headroom for this (maximum 10 total)."
-            )
+            #
+            # That "split into two beats" instruction only makes sense for
+            # a beat slide — the hook is a single fixed slot with no beats
+            # to split into. Sending it unconditionally on a hook overrun
+            # produced a real failure: the model, told to "split" a slide
+            # that can't be split, restructured the carousel instead and
+            # introduced a fresh violation on an unrelated beat on the
+            # retry. Branch on the violating slide's actual role so the
+            # hint is always something the model can literally do.
+            if first_error.role == SlotRole.hook:
+                retry_note += (
+                    "\n\nThe hook is a single fixed slide — it has no "
+                    "beats to split into, and no other slide should "
+                    "change. Just tighten the sub-heading itself: cut it "
+                    "down to the single sharpest supporting idea and drop "
+                    "secondary clauses, leaving every other slide exactly "
+                    "as it was."
+                )
+            else:
+                retry_note += (
+                    "\n\nDo not try to trim this beat further — that has "
+                    "already failed once. Split it into two beats instead: "
+                    "keep each piece of content (the quote, the statistic, the "
+                    "second idea — whatever is making this beat too long) but "
+                    "give it its own beat with its own headline, rather than "
+                    "compressing everything into one. There is slide-count "
+                    "headroom for this (maximum 10 total)."
+                )
         retry_message = (
             user_message
             + "\n\nYour previous response failed validation with this error:\n"

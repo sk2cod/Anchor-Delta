@@ -75,9 +75,10 @@ class WordBudgetExceededError(PlannerValidationError):
     retried beat went 34 -> 35 words, getting worse, not better).
     """
 
-    def __init__(self, message: str, slot_id: str):
+    def __init__(self, message: str, slot_id: str, role: SlotRole):
         super().__init__(message)
         self.slot_id = slot_id
+        self.role = role
 
 
 def _word_count(text: str) -> int:
@@ -141,6 +142,7 @@ def validate_carousel_shape(spec: CarouselSpec) -> None:
                     f"≤{MAX_HOOK_HEADLINE_WORDS} (allowing up to "
                     f"{_max_words(MAX_HOOK_HEADLINE_WORDS)} with tolerance).",
                     slot_id=slide.slot_id,
+                    role=slide.role,
                 )
             body_words = _word_count(slide.body)
             if body_words > _max_words(MAX_HOOK_BODY_WORDS):
@@ -149,6 +151,7 @@ def validate_carousel_shape(spec: CarouselSpec) -> None:
                     f"≤{MAX_HOOK_BODY_WORDS} (allowing up to "
                     f"{_max_words(MAX_HOOK_BODY_WORDS)} with tolerance).",
                     slot_id=slide.slot_id,
+                    role=slide.role,
                 )
         elif slide.role == SlotRole.beat:
             headline_words = _word_count(slide.headline)
@@ -159,6 +162,7 @@ def validate_carousel_shape(spec: CarouselSpec) -> None:
                     f"up to {_max_words(MAX_BEAT_HEADLINE_WORDS)} with "
                     "tolerance).",
                     slot_id=slide.slot_id,
+                    role=slide.role,
                 )
             body_words = _word_count(slide.body)
             if body_words > _max_words(MAX_BEAT_BODY_WORDS):
@@ -169,4 +173,5 @@ def validate_carousel_shape(spec: CarouselSpec) -> None:
                     "Split into two beats instead of cutting content — "
                     "there is slide-count headroom for this.",
                     slot_id=slide.slot_id,
+                    role=slide.role,
                 )
