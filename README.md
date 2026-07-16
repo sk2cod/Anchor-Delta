@@ -36,7 +36,10 @@ PostAssembler
 
 See [CAROUSEL_BLUEPRINT_v1.md](CAROUSEL_BLUEPRINT_v1.md) for the
 architectural spine and [CAROUSEL_DECISIONS.md](CAROUSEL_DECISIONS.md)
-for the decisions log.
+for the decisions log. See [ARCHITECTURE_SNAPSHOT.md](ARCHITECTURE_SNAPSHOT.md)
+for a whole-system, point-in-time reference (both engines + hosting),
+frozen as the pre-migration baseline for the Streamlit→Railway move
+tracked in [INFRA_DECISIONS.md](INFRA_DECISIONS.md).
 
 **Note:** Carousel generation requires local Streamlit only.
 Playwright (slide renderer) is not supported on Streamlit Cloud.
