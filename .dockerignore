@@ -1,0 +1,9 @@
+.venv/
+outputs/
+.env
+__pycache__/
+**/__pycache__/
+.git/
+.gitignore
+*.pyc
+.claude/
