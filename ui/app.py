@@ -130,7 +130,7 @@ def _chain_latex_to_text(latex: str) -> str:
     return text.strip()
 
 
-def _format_card_header(card, last_updated_at=None):
+def _format_card_header(card, last_updated_at=None, is_exported=False):
     ts = last_updated_at or card["last_delta_at"]
     last_updated = datetime.fromisoformat(str(ts).replace("Z", "+00:00")).astimezone(
         ZoneInfo("Australia/Sydney")
@@ -141,19 +141,20 @@ def _format_card_header(card, last_updated_at=None):
     is_research = card.get("source", "pipeline") == "research"
     badge_new = "🔍 RESEARCH" if is_research else "🔴 NEW"
     badge_old = "🔍 RESEARCH" if is_research else "📌"
+    exported_suffix = " ✅" if is_exported else ""
 
     if hours_ago < 3:
         hours_int = max(1, round(hours_ago))
         timestamp = f"updated {hours_int} hour{'s' if hours_int != 1 else ''} ago"
-        return f"{badge_new} · {card['umbrella_title']} — {timestamp}"
+        return f"{badge_new} · {card['umbrella_title']} — {timestamp}{exported_suffix}"
     elif hours_ago < 24:
         time_str = last_updated.strftime("%I:%M %p").lstrip("0")
         timestamp = f"updated today at {time_str}"
-        return f"{badge_new} · {card['umbrella_title']} — {timestamp}"
+        return f"{badge_new} · {card['umbrella_title']} — {timestamp}{exported_suffix}"
     else:
         days_ago = max(1, int(hours_ago // 24))
         timestamp = f"updated {days_ago} day{'s' if days_ago != 1 else ''} ago"
-        return f"{badge_old} · {card['umbrella_title']} — {timestamp}"
+        return f"{badge_old} · {card['umbrella_title']} — {timestamp}{exported_suffix}"
 
 
 def _format_run_timestamp(ts):
@@ -257,10 +258,11 @@ def _render_nodes_markdown(nodes_md: str):
             st.markdown(block)
 
 
-def render_card(card_data):
+def render_card(card_data, carousel_lookup=None):
     card = card_data["card"]
     delta_events = card_data["delta_events"]
     transmission = card_data["transmission"]
+    carousel_lookup = carousel_lookup or {}
 
     latest = delta_events[0] if delta_events else None
     older = delta_events[1:] if delta_events else []
@@ -270,17 +272,18 @@ def render_card(card_data):
         if delta_events else None
     )
 
-    # Single lookup, reused below for both the restore-after-refresh preview
-    # and the exported-status badge — computed once per card per render
-    # rather than twice (each render_card() call, active or archived, costs
-    # at most one extra Supabase query for domain-eligible cards).
+    # carousel_lookup is a {card_id: Carousel} dict the caller
+    # (render_domain_tab() / the Archive expander) already fetched once
+    # for every visible card via get_carousels_by_card_ids() — no query
+    # happens in this function anymore. Reused below for both the
+    # restore-after-refresh preview and the exported-status badges.
     is_carousel_domain = card.get('domain') in ('world', 'finance', 'ai_tech')
-    existing_carousel = None
-    if is_carousel_domain:
-        from db.carousel_queries import get_carousel_by_card_id
-        existing_carousel = get_carousel_by_card_id(card['id'])
+    existing_carousel = carousel_lookup.get(card['id']) if is_carousel_domain else None
+    is_exported = existing_carousel is not None and existing_carousel.status == CarouselStatus.exported
 
-    with st.expander(_format_card_header(card, last_updated_at=last_updated_at)):
+    with st.expander(
+        _format_card_header(card, last_updated_at=last_updated_at, is_exported=is_exported)
+    ):
         if latest and latest.get("tldr"):
             st.markdown(
                 f"<p style='font-size:17px;font-weight:500;border-left:4px solid #E24B4A;"
@@ -355,7 +358,7 @@ def render_card(card_data):
                     carousel_key = f"generate_carousel_{card['id']}"
                     if st.button("🎠", key=carousel_key, help="Generate Instagram carousel"):
                         st.session_state[f"carousel_generating_{card['id']}"] = True
-                    if existing_carousel is not None and existing_carousel.status == CarouselStatus.exported:
+                    if is_exported:
                         st.caption("✅ Exported")
 
             if st.session_state.get(f"confirm_archive_{card['id']}", False):
@@ -488,13 +491,16 @@ def render_domain_tab(domain_key, domain_last_run):
     if not cards:
         st.info(DOMAIN_PLACEHOLDER)
     else:
+        from db.carousel_queries import get_carousels_by_card_ids
+        carousel_lookup = get_carousels_by_card_ids([c["id"] for c in cards])
         for card in cards:
             render_card(
                 {
                     "card": card,
                     "delta_events": get_delta_events_for_card(card["id"]),
                     "transmission": get_transmission_for_card(card["id"]),
-                }
+                },
+                carousel_lookup=carousel_lookup,
             )
 
     with st.expander("🗑️ Noise Log — last 24 hours", expanded=False):
@@ -785,9 +791,11 @@ with st.expander("📦 Archive"):
     if not all_archived:
         st.caption("No archived cards yet.")
     else:
+        from db.carousel_queries import get_carousels_by_card_ids
         for domain_label, domain_key in DOMAIN_KEYS.items():
             domain_cards = get_archived_cards(domain=domain_key)
             if domain_cards:
+                carousel_lookup = get_carousels_by_card_ids([c["id"] for c in domain_cards])
                 with st.expander(f"{domain_label} ({len(domain_cards)})"):
                     for card in domain_cards:
                         render_card(
@@ -795,7 +803,8 @@ with st.expander("📦 Archive"):
                                 "card": card,
                                 "delta_events": get_delta_events_for_card(card["id"]),
                                 "transmission": get_transmission_for_card(card["id"]),
-                            }
+                            },
+                            carousel_lookup=carousel_lookup,
                         )
 
 # ── Danger Zone ───────────────────────────────────────────────────────────────

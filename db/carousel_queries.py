@@ -107,6 +107,36 @@ def get_carousel_by_card_id(card_id: str) -> Optional[Carousel]:
     return _carousel_from_row(response.data[0])
 
 
+def get_carousels_by_card_ids(card_ids: list) -> dict:
+    """
+    Batched version of get_carousel_by_card_id() — one query for every
+    card_id in card_ids instead of one query per card (used by
+    render_domain_tab() / the Archive expander in ui/app.py to look up an
+    entire tab's worth of cards at once). Returns {card_id: Carousel} for
+    the most recent carousel per card; card_ids with no carousel are
+    simply absent from the returned dict.
+    """
+    if not card_ids:
+        return {}
+
+    response = (
+        supabase_client.table("carousels")
+        .select("*")
+        .in_("card_id", card_ids)
+        .order("created_at", desc=True)
+        .execute()
+    )
+
+    result = {}
+    for row in response.data:
+        card_id = row["card_id"]
+        if card_id not in result:
+            # Rows arrive already sorted created_at DESC, so the first
+            # row seen per card_id is its most recent carousel.
+            result[card_id] = _carousel_from_row(row)
+    return result
+
+
 def update_carousel_status(carousel_id: UUID, status: CarouselStatus, timestamp_field: str) -> None:
     """Update status and corresponding timestamp."""
     update_data = {
