@@ -10,8 +10,8 @@ Carousel content, rendering, and prompt decisions keep going in
 
 **Format:** Decision / Date / Why / Alternatives considered / Status
 
-**Status values:** `Active` · `Active / In Progress` · `Superseded by #N` ·
-`Open` · `Deferred`
+**Status values:** `Active` · `Active / In Progress` · `Completed` ·
+`Superseded by #N` · `Open` · `Deferred`
 
 **Rules of the log:**
 - Every infra/deployment decision is recorded here before it's carried out
@@ -62,7 +62,20 @@ corresponding benefit.
   #38/#40), nowhere near the scale where serverless's per-invocation cold
   starts and packaging complexity would pay for themselves over a single
   always-on Railway container.
-**Status:** Active / In Progress
+**Status:** Completed
+
+**Follow-up (2026-07-17):** The Docker/Railway approach itself needed no
+changes — both real problems hit on the first deploy attempt were
+branch/process issues, not a flaw in this decision. Railway was building
+from `main`, which had no `Dockerfile` on it yet, and separately
+`railway-migration-stage1` existed only in the local working copy and had
+never been pushed to GitHub, so Railway could not have built from it even
+if pointed there. Once the branch was pushed to GitHub and Railway was
+pointed at it, the build and an in-container Playwright render succeeded
+on the first real attempt — the Dockerfile / `playwright install
+--with-deps chromium` approach worked exactly as designed once Railway
+was actually building the right branch. (Railway's connected branch was
+later repointed again, to `main` — see Decision #05.)
 
 ---
 
@@ -120,3 +133,102 @@ create itself, "Outbox" included.
   as a single, stateless authenticated HTTP call per file — no meaningful
   benefit for ~3 uploads/day.
 **Status:** Active / In Progress
+
+**Follow-up (2026-07-17):** Two issues surfaced during real-world testing,
+both fixed without revisiting the OAuth2-vs-service-account reasoning
+above: (a) the first working version of `upload_bundle()` uploaded files
+flat into the top-level `"Anchor & Delta - Railway"` folder instead of a
+per-carousel subfolder — a regression against the old `CAROUSEL_SYNC_DIR`
+behaviour, which always wrote one subfolder per bundle. Fixed by having
+`upload_bundle()` create a subfolder named after the bundle directory
+(the same `YYYY-MM-DD_domain_slug` name already used locally) before
+uploading into it. (b) Leaving `GOOGLE_DRIVE_FOLDER_ID` unset across
+multiple test runs caused `get_or_create_folder()` to create a new
+top-level folder on every run instead of reusing one, since there was
+nothing yet to read back. The folder ID must be captured from the logs
+after the first successful run and set as `GOOGLE_DRIVE_FOLDER_ID` to
+avoid accumulating duplicate top-level folders.
+
+---
+
+## #03 — Persistent volume for outputs/ (Stage 2)
+
+**Date:** 2026-07-17
+**Decision:** A Railway volume was created and mounted at `/app/outputs`,
+covering all four runtime write paths identified in the earlier audit:
+the render cache (`outputs/renders/`), cover images
+(`outputs/cover_images/`), the hashtag rotation log
+(`outputs/hashtag_rotation.json`), and the local Approve & Sync bundle
+fallback (`outputs/bundles/`).
+**Why:** All four paths already had defensive
+`mkdir(parents=True, exist_ok=True)` guards in place (confirmed in an
+earlier audit of `carousel/renderer.py`, `carousel/image_generator.py`,
+`carousel/cache.py`, and `carousel/assembler.py`), so no code changes were
+needed to make the volume work — the container writes to `/app/outputs`
+exactly as it always has; the only change is that path now persisting
+across restarts and redeploys instead of resetting to an empty directory
+each time.
+**Alternatives considered:**
+- Leave `/app/outputs` as ephemeral container storage and rely solely on
+  the Google Drive upload (Decision #02) as the only durable output.
+  Rejected: Drive upload only covers finished export bundles, and only
+  when the `GOOGLE_OAUTH_*` vars are set — it does nothing for the render
+  cache or cover-image intermediates the app depends on between
+  generation and Approve & Sync, and the local bundle fallback still
+  needs a durable directory when Drive isn't configured.
+**Verification:** Wrote a test file via Railway's Console, triggered a
+real redeploy (confirmed by a changed container ID, not just a
+config-only "changes to apply" deploy with no new container), and
+confirmed the file survived the redeploy.
+**Status:** Completed
+
+---
+
+## #04 — Password gate via shared APP_PASSWORD, not a multi-user auth system
+
+**Date:** 2026-07-17
+**Decision:** A shared-password gate in `ui/app.py`, checked against an
+`APP_PASSWORD` env var via `secrets.compare_digest()` (not `==`). Fails
+open when `APP_PASSWORD` is unset (local dev — no gate at all, unchanged
+from before Stage 4) and fails closed when it is set (any public
+deployment).
+**Why:** This app has no separable backend surface to defend — Streamlit's
+UI *is* the entire application, unlike a split frontend/backend
+architecture where the backend independently verifies every request
+regardless of what the frontend shows. A shared password in front of the
+one process that exists is sufficient; a real multi-user auth system would
+be defending a boundary this app doesn't have.
+**Alternatives considered:**
+- A real multi-user auth system (e.g. Supabase Auth). Rejected: this is a
+  solo-use app with one intended user, and there is no independent backend
+  API surface for per-user sessions to actually gate — the complexity of
+  user accounts, sessions, and token verification would add real
+  engineering cost for a boundary that doesn't exist here.
+**Verification:** `APP_PASSWORD` set independently in two separate secrets
+stores — Railway's Variables tab and Streamlit Cloud's Secrets (TOML,
+root-level key so it also mirrors into `os.environ`) — and the gate
+verified end-to-end on both deployments.
+**Status:** Completed
+
+---
+
+## #05 — Branch unification: main feeds both deployments
+
+**Date:** 2026-07-17
+**Decision:** `railway-migration-stage1` was merged into `main` via a real
+merge commit (`--no-ff`, full commit history preserved — not squashed or
+rebased), and Railway's connected branch was repointed from
+`railway-migration-stage1` to `main`. From this point, a single branch
+(`main`) feeds both the Streamlit Cloud deployment and the Railway
+deployment.
+**Why:** Two long-lived branches tracked by two different deployment
+targets would require every future change to be manually forward-ported to
+both, with the two deployments silently drifting apart the moment either
+one was updated and the other forgotten.
+**Alternatives considered:**
+- Keep `railway-migration-stage1` as a permanent branch, with Railway
+  tracking it indefinitely while Streamlit Cloud continues tracking
+  `main`. Rejected: makes divergence the default outcome rather than an
+  exception — every change would need deliberate duplication across both
+  branches instead of a single push updating both deployments.
+**Status:** Completed
