@@ -132,7 +132,7 @@ create itself, "Outbox" included.
   new failure mode (mount drops, sync lag) to what the Drive API handles
   as a single, stateless authenticated HTTP call per file — no meaningful
   benefit for ~3 uploads/day.
-**Status:** Active / In Progress
+**Status:** Completed
 
 **Follow-up (2026-07-17):** Two issues surfaced during real-world testing,
 both fixed without revisiting the OAuth2-vs-service-account reasoning
