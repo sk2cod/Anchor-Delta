@@ -63,3 +63,60 @@ corresponding benefit.
   starts and packaging complexity would pay for themselves over a single
   always-on Railway container.
 **Status:** Active / In Progress
+
+---
+
+## #02 — Google Drive upload via user-delegated OAuth2, not a service account
+
+**Date:** 2026-07-17
+**Decision:** "Approve & Sync" uploads the export bundle directly to Google
+Drive via the Drive API (`carousel/drive_sync.py`), authenticated as the
+user's own Google account through a one-time OAuth2 consent flow
+(`scripts/get_drive_refresh_token.py`) that yields a long-lived refresh
+token. Scope is `drive.file` — the narrowest scope that can create and
+manage files, restricted to files/folders the app itself created. Uploads
+go into a new folder named exactly `"Anchor & Delta - Railway"`, created
+via the API on first run and cached thereafter via `GOOGLE_DRIVE_FOLDER_ID`
+— not the pre-existing local `"Outbox"` folder `CAROUSEL_SYNC_DIR` points
+at today. This upload path is independent of `CAROUSEL_SYNC_DIR`: when the
+three `GOOGLE_OAUTH_*` env vars are all present, `CAROUSEL_SYNC_DIR` is not
+consulted at all; when any is missing, the existing local
+`outputs/bundles/`/`CAROUSEL_SYNC_DIR` write behaves exactly as before,
+unchanged.
+**Why:** A Railway container has no local filesystem that syncs to Google
+Drive the way a desktop Drive-sync client does on the current local-only
+setup — `CAROUSEL_SYNC_DIR` is a path on a machine with Google Drive for
+Desktop installed, which a container will never have. The Drive API is the
+only way to actually reach Drive from inside the container. A **service
+account** was the first design considered and rejected immediately on a
+hard constraint, not a preference: personal Gmail accounts (this project's
+account) give service accounts a **0GB Drive storage quota** — every
+upload would fail outright regardless of code correctness, because service
+accounts only get real storage on Google Workspace domains, not personal
+accounts. User-delegated OAuth2 (the account's own quota, via a refresh
+token obtained once through a real consent screen) is therefore not just
+preferred but the only working option for a personal account. `drive.file`
+scope (rather than broader `drive` scope) was chosen so the app can never
+see or touch the user's other Drive content, including the existing
+`CAROUSEL_SYNC_DIR`-linked `"Outbox"` folder — which is precisely *why* a
+new app-created folder is required rather than reusing that one: a
+`drive.file`-scoped token has no visibility into any folder it didn't
+create itself, "Outbox" included.
+**Alternatives considered:**
+- **Service account with domain-wide delegation or a shared Workspace
+  drive.** Rejected: this is a personal Gmail account, not a Google
+  Workspace domain — there is no admin console to grant domain-wide
+  delegation and no shared drive to delegate into. Not applicable, not
+  just undesirable.
+- **Broader `drive` scope, reusing the existing `"Outbox"` folder.**
+  Rejected: would require the much broader `drive` (or `drive.readonly`
+  variants) scope just to locate a pre-existing, human-created folder by
+  name — `drive.file` cannot see it — trading a meaningfully larger
+  attack surface (visibility into the user's entire Drive) for the sole
+  convenience of reusing one folder name instead of creating a new one.
+- **Mounting a synced local folder inside the container (e.g. `rclone
+  mount`, a Drive FUSE layer).** Rejected: adds a background daemon and a
+  new failure mode (mount drops, sync lag) to what the Drive API handles
+  as a single, stateless authenticated HTTP call per file — no meaningful
+  benefit for ~3 uploads/day.
+**Status:** Active / In Progress

@@ -69,3 +69,16 @@ FRESHNESS_HOURS = 48
 # phone without a manual copy step. carousel/assembler.py falls back to the
 # local outputs/bundles/ folder if this is left empty.
 CAROUSEL_SYNC_DIR = os.getenv("CAROUSEL_SYNC_DIR", r"G:\My Drive\Anchor & Delta\Outbox")
+
+# Google Drive upload for Approve & Sync (Stage 3 — INFRA_DECISIONS.md #02).
+# All optional: carousel/assembler.py and carousel/drive_sync.py read these
+# directly from the environment (same "soft dependency, never crash" pattern
+# as OPENAI_API_KEY in carousel/image_generator.py) and fall back to the
+# existing local outputs/bundles/ write when any of the three OAuth vars is
+# missing — so these are deliberately absent from `_required` above. Get
+# GOOGLE_OAUTH_REFRESH_TOKEN via scripts/get_drive_refresh_token.py.
+# GOOGLE_DRIVE_FOLDER_ID is auto-created and logged on first run if unset.
+GOOGLE_OAUTH_CLIENT_ID = os.getenv("GOOGLE_OAUTH_CLIENT_ID", "")
+GOOGLE_OAUTH_CLIENT_SECRET = os.getenv("GOOGLE_OAUTH_CLIENT_SECRET", "")
+GOOGLE_OAUTH_REFRESH_TOKEN = os.getenv("GOOGLE_OAUTH_REFRESH_TOKEN", "")
+GOOGLE_DRIVE_FOLDER_ID = os.getenv("GOOGLE_DRIVE_FOLDER_ID", "")

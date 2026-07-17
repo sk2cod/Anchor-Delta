@@ -76,6 +76,13 @@ Playwright (slide renderer) is not supported on Streamlit Cloud.
    - `SUPABASE_URL`
    - `SUPABASE_KEY`
    - `GEMINI_API_KEY`
+   - Optional, for Google Drive upload on Approve & Sync (Stage 3 —
+     see `INFRA_DECISIONS.md` #02): `GOOGLE_OAUTH_CLIENT_ID`,
+     `GOOGLE_OAUTH_CLIENT_SECRET`, `GOOGLE_OAUTH_REFRESH_TOKEN`
+     (obtained via `scripts/get_drive_refresh_token.py`), and
+     `GOOGLE_DRIVE_FOLDER_ID` (auto-created and logged on first run if left
+     unset). Leave all four unset to keep the existing local
+     `outputs/bundles/` export exactly as-is.
 5. Set up Supabase database using the schema in `db/schema.sql`
 6. Run: `streamlit run ui/app.py`
 
