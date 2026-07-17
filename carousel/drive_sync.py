@@ -103,17 +103,34 @@ def get_or_create_folder() -> str:
 
 def upload_bundle(bundle_dir: Path, folder_id: str) -> list[str]:
     """
-    Upload every file in bundle_dir into the given Drive folder ID,
-    preserving filenames. Returns the uploaded Drive file IDs, in the
-    same order as bundle_dir's sorted directory listing.
+    Upload every file in bundle_dir into a new Drive subfolder created
+    inside folder_id, named exactly after bundle_dir's own directory name
+    (the same YYYY-MM-DD_domain_slug convention as the local bundle
+    directory — see carousel/assembler.py's _bundle_folder_name()).
+    Preserves filenames. Returns the uploaded Drive file IDs, in the same
+    order as bundle_dir's sorted directory listing.
+
+    No duplicate-checking on the subfolder name: each carousel's bundle
+    name is already unique (date + domain + slug, with a collision suffix
+    already applied locally by assembler._reserve_bundle_dir() if needed),
+    so a fresh subfolder is created unconditionally on every call.
     """
     service = _get_service()
+
+    subfolder_metadata = {
+        "name": Path(bundle_dir).name,
+        "mimeType": "application/vnd.google-apps.folder",
+        "parents": [folder_id],
+    }
+    subfolder = service.files().create(body=subfolder_metadata, fields="id").execute()
+    subfolder_id = subfolder["id"]
+
     uploaded_ids = []
 
     for path in sorted(Path(bundle_dir).iterdir()):
         if not path.is_file():
             continue
-        file_metadata = {"name": path.name, "parents": [folder_id]}
+        file_metadata = {"name": path.name, "parents": [subfolder_id]}
         media = MediaFileUpload(str(path), resumable=False)
         uploaded = (
             service.files()
