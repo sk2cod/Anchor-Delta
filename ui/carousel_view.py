@@ -408,9 +408,14 @@ def _render_script_controls(carousel: Carousel) -> None:
     with col3:
         if st.button("✅ Approve & Sync", key=f"approve_btn_{carousel.id}"):
             try:
+                # export_carousel() already unifies the Drive-upload and
+                # local-fallback paths into one success/failure outcome
+                # (carousel/assembler.py) — reaching here means the bundle
+                # landed somewhere real either way, so both count as
+                # "exported" (INFRA_DECISIONS.md follow-up on Decision #02).
                 bundle_dir = export_carousel(carousel, EXPORT_OUTPUT_DIR)
-                update_carousel_status(carousel.id, CarouselStatus.approved, "approved_at")
-                carousel.status = CarouselStatus.approved
+                update_carousel_status(carousel.id, CarouselStatus.exported, "exported_at")
+                carousel.status = CarouselStatus.exported
                 st.session_state[f"carousel_approved_{carousel.id}"] = True
                 st.success(f"Synced to {bundle_dir}")
             except AssemblerError as e:

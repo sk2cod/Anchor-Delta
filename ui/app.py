@@ -10,6 +10,7 @@ from zoneinfo import ZoneInfo
 
 import streamlit as st
 
+from carousel.models import CarouselStatus
 from config import CAROUSEL_DOMAINS, FRESHNESS_HOURS, MAX_ACTIVE_CARDS
 from db.cards import get_active_cards, get_archived_cards, get_card_by_id
 from db.delta_events import get_delta_events_for_card, get_last_run_per_domain
@@ -269,6 +270,16 @@ def render_card(card_data):
         if delta_events else None
     )
 
+    # Single lookup, reused below for both the restore-after-refresh preview
+    # and the exported-status badge — computed once per card per render
+    # rather than twice (each render_card() call, active or archived, costs
+    # at most one extra Supabase query for domain-eligible cards).
+    is_carousel_domain = card.get('domain') in ('world', 'finance', 'ai_tech')
+    existing_carousel = None
+    if is_carousel_domain:
+        from db.carousel_queries import get_carousel_by_card_id
+        existing_carousel = get_carousel_by_card_id(card['id'])
+
     with st.expander(_format_card_header(card, last_updated_at=last_updated_at)):
         if latest and latest.get("tldr"):
             st.markdown(
@@ -340,10 +351,12 @@ def render_card(card_data):
                 if st.button("🗑️", key=f"delete_{card['id']}", help="Delete this card permanently"):
                     st.session_state[f"confirm_delete_{card['id']}"] = True
             with col4:
-                if card.get('domain') in ('world', 'finance', 'ai_tech'):
+                if is_carousel_domain:
                     carousel_key = f"generate_carousel_{card['id']}"
                     if st.button("🎠", key=carousel_key, help="Generate Instagram carousel"):
                         st.session_state[f"carousel_generating_{card['id']}"] = True
+                    if existing_carousel is not None and existing_carousel.status == CarouselStatus.exported:
+                        st.caption("✅ Exported")
 
             if st.session_state.get(f"confirm_archive_{card['id']}", False):
                 st.warning("Move this card to Archive?")
@@ -378,7 +391,7 @@ def render_card(card_data):
                     st.session_state[f"confirm_delete_{card['id']}"] = False
                     st.rerun()
 
-        if card.get('domain') in ('world', 'finance', 'ai_tech'):
+        if is_carousel_domain:
             if st.session_state.get(f"carousel_generating_{card['id']}"):
                 with st.spinner("Generating carousel..."):
                     try:
@@ -429,6 +442,15 @@ def render_card(card_data):
                         st.session_state[
                             f"carousel_generating_{card['id']}"
                         ] = False
+
+            if f"carousel_{card['id']}" not in st.session_state and existing_carousel is not None:
+                # Recover a previously-generated-but-not-yet-exported
+                # carousel after a page refresh. Generation already
+                # persists to Supabase (assemble_carousel(persist=True) in
+                # the block above) — only the preview UI's session_state
+                # was ever ephemeral. Lookup only, never triggers
+                # regeneration.
+                st.session_state[f"carousel_{card['id']}"] = existing_carousel
 
             if f"carousel_{card['id']}" in st.session_state:
                 from ui.carousel_view import render_carousel_preview

@@ -58,15 +58,7 @@ def upsert_carousel(carousel: Carousel) -> None:
     supabase_client.table("carousels").upsert(data, on_conflict="id").execute()
 
 
-def get_carousel(carousel_id: UUID) -> Optional[Carousel]:
-    """Retrieve a carousel record by ID."""
-    response = (
-        supabase_client.table("carousels").select("*").eq("id", str(carousel_id)).execute()
-    )
-    if not response.data:
-        return None
-
-    row = response.data[0]
+def _carousel_from_row(row: dict) -> Carousel:
     return Carousel(
         id=row["id"],
         card_id=row["card_id"],
@@ -82,6 +74,37 @@ def get_carousel(carousel_id: UUID) -> Optional[Carousel]:
         exported_at=row.get("exported_at"),
         published_at=row.get("published_at"),
     )
+
+
+def get_carousel(carousel_id: UUID) -> Optional[Carousel]:
+    """Retrieve a carousel record by ID."""
+    response = (
+        supabase_client.table("carousels").select("*").eq("id", str(carousel_id)).execute()
+    )
+    if not response.data:
+        return None
+
+    return _carousel_from_row(response.data[0])
+
+
+def get_carousel_by_card_id(card_id: str) -> Optional[Carousel]:
+    """
+    Retrieve the most recent carousel record for a given card, or None if
+    the card has never had one generated. Uses the existing
+    idx_carousels_card_id index. Lookup only — never triggers generation.
+    """
+    response = (
+        supabase_client.table("carousels")
+        .select("*")
+        .eq("card_id", card_id)
+        .order("created_at", desc=True)
+        .limit(1)
+        .execute()
+    )
+    if not response.data:
+        return None
+
+    return _carousel_from_row(response.data[0])
 
 
 def update_carousel_status(carousel_id: UUID, status: CarouselStatus, timestamp_field: str) -> None:
