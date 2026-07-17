@@ -17,3 +17,6 @@ playwright
 Pillow
 Jinja2
 openai
+google-auth-oauthlib
+google-api-python-client
+google-auth

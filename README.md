@@ -36,7 +36,10 @@ PostAssembler
 
 See [CAROUSEL_BLUEPRINT_v1.md](CAROUSEL_BLUEPRINT_v1.md) for the
 architectural spine and [CAROUSEL_DECISIONS.md](CAROUSEL_DECISIONS.md)
-for the decisions log.
+for the decisions log. See [ARCHITECTURE_SNAPSHOT.md](ARCHITECTURE_SNAPSHOT.md)
+for a whole-system, point-in-time reference (both engines + hosting),
+frozen as the pre-migration baseline for the Streamlit→Railway move
+tracked in [INFRA_DECISIONS.md](INFRA_DECISIONS.md).
 
 **Note:** Carousel generation requires local Streamlit only.
 Playwright (slide renderer) is not supported on Streamlit Cloud.
@@ -73,6 +76,16 @@ Playwright (slide renderer) is not supported on Streamlit Cloud.
    - `SUPABASE_URL`
    - `SUPABASE_KEY`
    - `GEMINI_API_KEY`
+   - Optional, for Google Drive upload on Approve & Sync (Stage 3 —
+     see `INFRA_DECISIONS.md` #02): `GOOGLE_OAUTH_CLIENT_ID`,
+     `GOOGLE_OAUTH_CLIENT_SECRET`, `GOOGLE_OAUTH_REFRESH_TOKEN`
+     (obtained via `scripts/get_drive_refresh_token.py`), and
+     `GOOGLE_DRIVE_FOLDER_ID` (auto-created and logged on first run if left
+     unset). Leave all four unset to keep the existing local
+     `outputs/bundles/` export exactly as-is.
+   - Optional, for a password gate on a public Railway deployment (Stage
+     4): `APP_PASSWORD`. Leave unset for local dev — the app runs with no
+     gate at all, same as before.
 5. Set up Supabase database using the schema in `db/schema.sql`
 6. Run: `streamlit run ui/app.py`
 

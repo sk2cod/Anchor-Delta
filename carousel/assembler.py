@@ -8,6 +8,7 @@ LLM-generated (Decision #31).
 """
 
 import json
+import os
 import random
 import re
 from datetime import datetime
@@ -212,22 +213,45 @@ def _reserve_bundle_dir(base_dir: Path, folder_name: str) -> Path:
     return base_dir / f"{folder_name}_{uuid4().hex[:4]}"
 
 
+_GOOGLE_DRIVE_ENV_VARS = (
+    "GOOGLE_OAUTH_CLIENT_ID",
+    "GOOGLE_OAUTH_CLIENT_SECRET",
+    "GOOGLE_OAUTH_REFRESH_TOKEN",
+)
+
+
+def _drive_configured() -> bool:
+    return all(os.getenv(var) for var in _GOOGLE_DRIVE_ENV_VARS)
+
+
 def export_carousel(carousel: Carousel, output_dir: Path) -> Path:
     """
-    Write carousel bundle to its per-carousel sync subfolder (Decision #52).
-    Returns path to the bundle directory.
+    Write carousel bundle to its per-carousel sync subfolder (Decision #52),
+    then, when Google Drive OAuth is configured (Stage 3 —
+    INFRA_DECISIONS.md #02), upload that bundle to Drive.
+    Returns path to the local bundle directory (the local write always
+    happens: it's the finished export when Drive isn't configured, and the
+    staging directory uploaded from when it is).
     Bundle: slide PNGs + caption.txt + pinned_comment.txt
             + hashtags.txt + manifest.json
 
-    Writes under CAROUSEL_SYNC_DIR (config.py) when set — typically a
-    Google Drive / iCloud synced folder, so "Approve & Sync" reaches the
-    phone without a manual copy step (Blueprint §12.4). Falls back to
-    output_dir if CAROUSEL_SYNC_DIR is unset/empty. This function has no
-    knowledge of the sync layer itself — it only ever writes to a
-    configured directory.
+    Local write target: CAROUSEL_SYNC_DIR (config.py) when set — typically
+    a Google Drive-desktop / iCloud synced folder — else output_dir. Never
+    used when Drive OAuth is configured: Drive uploads always stage into
+    output_dir directly, not CAROUSEL_SYNC_DIR, since the two are separate
+    sync mechanisms and mixing them would upload whatever else happens to
+    be sitting in the local Drive-desktop mount rather than this run's own
+    bundle. This function has no other knowledge of the sync layer itself —
+    it only ever writes to a configured directory (and, when applicable,
+    uploads what it just wrote).
     """
-    sync_root = CAROUSEL_SYNC_DIR.strip() if CAROUSEL_SYNC_DIR else ""
-    base_dir = Path(sync_root) if sync_root else Path(output_dir)
+    use_drive = _drive_configured()
+
+    if use_drive:
+        base_dir = Path(output_dir)
+    else:
+        sync_root = CAROUSEL_SYNC_DIR.strip() if CAROUSEL_SYNC_DIR else ""
+        base_dir = Path(sync_root) if sync_root else Path(output_dir)
     bundle_dir = base_dir
 
     try:
@@ -268,6 +292,12 @@ def export_carousel(carousel: Carousel, output_dir: Path) -> Path:
         (bundle_dir / "manifest.json").write_text(
             json.dumps(manifest, indent=2), encoding="utf-8"
         )
+
+        if use_drive:
+            from carousel.drive_sync import get_or_create_folder, upload_bundle
+
+            drive_folder_id = get_or_create_folder()
+            upload_bundle(bundle_dir, drive_folder_id)
     except AssemblerError:
         raise
     except Exception as e:
