@@ -3,6 +3,7 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import re
+import secrets
 from collections import Counter
 from datetime import datetime
 from zoneinfo import ZoneInfo
@@ -21,6 +22,25 @@ st.set_page_config(
     page_icon="⚓",
     layout="wide",
 )
+
+# ── Password gate (Stage 4 — public Railway deployment) ──────────────────────
+# APP_PASSWORD is optional. Left unset (e.g. local dev, no APP_PASSWORD in
+# .env), the gate is skipped entirely — deliberate fail-open, not an
+# oversight: a local Streamlit instance is already only reachable on the
+# user's own machine, so there is nothing to gate. The gate only does
+# anything once the app is reachable at a public Railway URL and
+# APP_PASSWORD is set there.
+_app_password = os.getenv("APP_PASSWORD", "")
+if _app_password and not st.session_state.get("authenticated", False):
+    st.title("⚓ Anchor & Delta")
+    entered_password = st.text_input("Password", type="password", key="password_gate_input")
+    if st.button("Enter"):
+        if secrets.compare_digest(entered_password, _app_password):
+            st.session_state["authenticated"] = True
+            st.rerun()
+        else:
+            st.error("Incorrect password.")
+    st.stop()
 
 st.markdown(
     """

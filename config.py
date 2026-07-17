@@ -82,3 +82,12 @@ GOOGLE_OAUTH_CLIENT_ID = os.getenv("GOOGLE_OAUTH_CLIENT_ID", "")
 GOOGLE_OAUTH_CLIENT_SECRET = os.getenv("GOOGLE_OAUTH_CLIENT_SECRET", "")
 GOOGLE_OAUTH_REFRESH_TOKEN = os.getenv("GOOGLE_OAUTH_REFRESH_TOKEN", "")
 GOOGLE_DRIVE_FOLDER_ID = os.getenv("GOOGLE_DRIVE_FOLDER_ID", "")
+
+# Password gate for public Railway deployment (Stage 4). ui/app.py reads
+# APP_PASSWORD directly via os.getenv() at the top of the script (same
+# "soft/optional env var" pattern as GOOGLE_OAUTH_* above), so this constant
+# is tracked here for documentation/discoverability only. Deliberately left
+# out of `_required` above: unset means the gate is skipped entirely, the
+# correct default for local dev where the app was never reachable by anyone
+# else in the first place.
+APP_PASSWORD = os.getenv("APP_PASSWORD", "")

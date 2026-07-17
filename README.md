@@ -83,6 +83,9 @@ Playwright (slide renderer) is not supported on Streamlit Cloud.
      `GOOGLE_DRIVE_FOLDER_ID` (auto-created and logged on first run if left
      unset). Leave all four unset to keep the existing local
      `outputs/bundles/` export exactly as-is.
+   - Optional, for a password gate on a public Railway deployment (Stage
+     4): `APP_PASSWORD`. Leave unset for local dev — the app runs with no
+     gate at all, same as before.
 5. Set up Supabase database using the schema in `db/schema.sql`
 6. Run: `streamlit run ui/app.py`
 
